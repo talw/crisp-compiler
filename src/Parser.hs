@@ -1,16 +1,13 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module Parser where
-
-import ClassyPrelude hiding ((<|>), try)
 
 import Text.Parsec
 import Text.Parsec.String (Parser)
-import Control.Applicative (liftA3)
 import Data.Maybe (fromJust)
-
+import Data.Functor ((<$>), (<$))
 import qualified Lexer as Lex
 import Syntax
+import Control.Applicative (liftA3, (<*>))
+import Control.Monad (mzero)
 
 numberP :: Parser Expr
 numberP = NumberExp <$> Lex.float
