@@ -2,13 +2,23 @@ module Syntax where
 
 type Name = String
 
-binOps :: [String]
-binOps =  ["+","*","-","/"]
+data BinOp = Add
+           | Sub
+           | Mul
+           | Div
+  deriving (Eq, Ord, Show)
 
-bools :: [(String, Bool)]
-bools =  [("#T", True)
-         ,("#F", False)
-         ]
+str2binOp :: [(String, BinOp)]
+str2binOp  = [("+", Add)
+             ,("-", Sub)
+             ,("*", Mul)
+             ,("/", Div)
+             ]
+
+str2bool :: [(String, Bool)]
+str2bool =  [("T", True)
+            ,("F", False)
+            ]
 
 data Expr
   = NumberExp Double
@@ -18,5 +28,5 @@ data Expr
   | CallExp Name [Expr]
   | Function Name [Name] Expr
   | Extern Name [Name]
-  | BinOpExp Name Expr Expr
+  | BinOpExp BinOp Expr Expr
   deriving (Eq, Ord, Show)
