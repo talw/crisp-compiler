@@ -2,9 +2,13 @@ module Syntax where
 
 type Name = String
 
-binOps, bools :: [String]
-binOps = ["+","*","-","/"]
-bools = ["#T", "#F"]
+binOps :: [String]
+binOps =  ["+","*","-","/"]
+
+bools :: [(String, Bool)]
+bools =  [("#T", True)
+         ,("#F", False)
+         ]
 
 data Expr
   = NumberExp Double

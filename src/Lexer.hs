@@ -11,16 +11,18 @@ import qualified Text.Parsec.Token as Tok
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
   where
-    reserved = bools ++ binOps
+    reservedNames = map fst bools ++ binOps
     style = emptyDef {
                Tok.commentLine = "#"
-             , Tok.reservedNames = reserved
+             , Tok.reservedNames = reservedNames
              }
 
-float      = Tok.float lexer
-parens     = Tok.parens lexer
-commaSep   = Tok.commaSep lexer
-identifier = Tok.identifier lexer
-whiteSpace = Tok.whiteSpace lexer
-reserved   = Tok.reserved lexer
-reservedOp = Tok.reservedOp lexer
+float         = Tok.float lexer
+parens        = Tok.parens lexer
+commaSep      = Tok.commaSep lexer
+identifier    = Tok.identifier lexer
+whiteSpace    = Tok.whiteSpace lexer
+reserved      = Tok.reserved lexer
+reservedOp    = Tok.reservedOp lexer
+operator      = Tok.operator lexer
+stringLiteral = Tok.stringLiteral lexer
