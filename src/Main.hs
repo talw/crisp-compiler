@@ -1,7 +1,8 @@
 module Main where
 
 import Parser
-import Syntax
+import Emit
+import Codegen
 
 import System.Console.Haskeline
 import System.Environment (getArgs)
@@ -10,26 +11,36 @@ import qualified LLVM.General.AST as AST
 import Data.Functor (void)
 import Control.Monad.IO.Class (liftIO)
 
-processFile :: FilePath -> IO (Maybe Expr)
-processFile fname = readFile fname >>= process
+
+initModule :: AST.Module
+initModule = emptyModule "Default initial module"
+
+processFile :: FilePath -> IO (Maybe AST.Module)
+processFile fname = readFile fname >>= process initModule
 
 repl :: IO ()
-repl = runInputT defaultSettings loop
-  where
-  loop = do
-    minput <- getInputLine "ready> "
-    case minput of
-      Nothing -> outputStrLn "Goodbye."
-      Just input -> do
-        _ <- liftIO $ process input
-        loop
+repl = runInputT defaultSettings (loop initModule)
+ where loop modl = do
+         minput <- getInputLine "ready> "
+         case minput of
+           Nothing -> outputStrLn "Goodbye."
+           Just input -> do
+             mmodl' <- liftIO $ process modl input
+             case mmodl' of
+               Just modl' -> loop modl'
+               Nothing -> do
+                 outputStrLn "Failed compiling."
+                 loop modl
 
-process :: String -> IO (Maybe Expr)
-process source = do
+process :: AST.Module -> String -> IO (Maybe AST.Module)
+process modl source = do
   let res = parseExpr source
   case res of
     Left err -> print err >> return Nothing
-    Right ast -> print ast >> return (Just ast)
+    Right ast -> do
+      print ast
+      modl' <- codegen modl [ast]
+      return $ Just modl'
 
 main :: IO ()
 main = do
@@ -38,15 +49,10 @@ main = do
     []      -> repl
     fname : _ -> void $ processFile fname
 
-
-
-{-initModule :: AST.Module-}
-{-initModule = emptyModule "my cool jit"-}
-
 {-process :: AST.Module -> String -> IO (Maybe AST.Module)-}
-{-process modo source = do-}
-  {-let res = parseToplevel source-}
-  {-case res of-}
+{-process modl source = do-}
+  {-let ast = parseExpr source-}
+  {-case ast of-}
     {-Left err -> print err >> return Nothing-}
     {-Right ex -> do-}
       {-ast <- codegen modo ex-}

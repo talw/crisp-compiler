@@ -2,22 +2,19 @@ module Parser where
 
 import Text.Parsec
 import Text.Parsec.String (Parser)
-import Text.Parsec.Char (string)
 import Data.Maybe (fromJust)
 import Data.Functor ((<$>), (<$))
 import Data.Foldable (asum)
 import qualified Lexer as Lex
 import Syntax
 import Control.Applicative (liftA3, (<*>))
-import Debug.Trace
 
 numberP :: Parser Expr
 numberP = NumberExp <$> (try Lex.float <|>
                          fromIntegral <$> Lex.integer)
 
 oneOfReserved :: [String] -> Parser String
-oneOfReserved = asum . map (\x -> trace x $ Lex.lexeme (string x))
-{-oneOfReserved = asum . map (\x -> trace x $ Lex.reserved x)-}
+oneOfReserved = asum . map (Lex.lexeme . string)
 
 mapP :: [(String, a)] -> Parser a
 mapP aList = fromJust . flip lookup aList <$> oneOfReserved (map fst aList)

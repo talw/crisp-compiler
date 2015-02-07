@@ -13,16 +13,15 @@ import qualified LLVM.General.AST.FloatingPointPredicate as FP
 import Data.Traversable
 import Control.Monad.Trans.Except
 import Control.Monad
-import qualified Data.Map as Map
 
 import Codegen
-import qualified Syntax as S
+import Syntax
 
 toSig :: [String] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (double, AST.Name x))
 
-codegenTop :: S.Expr -> LLVM ()
-codegenTop (S.Function name args body) = define double name fnargs bls
+codegenTop :: Expr -> LLVM ()
+codegenTop (Function name args body) = define double name fnargs bls
   where
     fnargs = toSig args
     bls = createBlocks $ execCodegen $ do
@@ -34,7 +33,7 @@ codegenTop (S.Function name args body) = define double name fnargs bls
         assign a var
       cgen body >>= ret
 
-codegenTop (S.Extern name args) = external double name fnargs
+codegenTop (Extern name args) = external double name fnargs
   where fnargs = toSig args
 
 codegenTop expr = define double "main" [] blks
@@ -53,35 +52,37 @@ lt a b = do
   test <- fcmp FP.ULT a b
   uitofp double test
 
-binops :: Map.Map S.Name (AST.Operand -> AST.Operand -> Codegen AST.Operand)
-binops = Map.fromList [
-      ("+", fadd)
-    , ("-", fsub)
-    , ("*", fmul)
-    , ("/", fdiv)
-    , ("<", lt)
-  ]
+asIRbinOp :: BinOp -> AST.Operand -> AST.Operand -> Codegen AST.Operand
+asIRbinOp Add = fadd
+asIRbinOp Sub = fsub
+asIRbinOp Mul = fmul
+asIRbinOp Div = fdiv
 
-cgen :: S.Expr -> Codegen AST.Operand
+{-binops :: Map.Map S.Name (AST.Operand -> AST.Operand -> Codegen AST.Operand)-}
+{-binops = Map.fromList [-}
+      {-("+", fadd)-}
+    {-, ("-", fsub)-}
+    {-, ("*", fmul)-}
+    {-, ("/", fdiv)-}
+  {-]-}
+
+cgen :: Expr -> Codegen AST.Operand
+cgen (BinOpExp op a b) = do
+  ca <- cgen a
+  cb <- cgen b
+  asIRbinOp op ca cb
+cgen (VarExp x) = getvar x >>= load
+cgen (NumberExp n) = return $ constOpr $ C.Float (F.Double n)
+cgen (CallExp fn args) = do
+  operands <- traverse cgen args
+  call (externf (AST.Name fn)) operands
+cgen _ = error "cgen called with unexpected Expr"
 --cgen (S.UnaryOp op a) = cgen $ S.Call ("unary" ++ op) [a]
 --cgen (S.BinaryOp "=" (S.Var var) val) = do
   --a <- getvar var
   --cval <- cgen val
   --store a cval
   --return cval
-cgen (S.BinaryOp op a b) =
-  case Map.lookup op binops of
-    Just f  -> do
-      ca <- cgen a
-      cb <- cgen b
-      f ca cb
-    Nothing -> error "No such operator"
-cgen (S.Var x) = getvar x >>= load
-cgen (S.NumberExp n) = return $ constOpr $ C.Float (F.Double n)
---cgen (S.Call fn args) = do
-  --largs <- traverse cgen args
-  --call (externf (AST.Name fn)) largs
-cgen _ = error "cgen called with unexpected Expr (Function | Extern)"
 
 -------------------------------------------------------------------------------
 -- Compilation
@@ -90,12 +91,12 @@ cgen _ = error "cgen called with unexpected Expr (Function | Extern)"
 liftError :: ExceptT String IO a -> IO a
 liftError = runExceptT >=> either fail return
 
-codegen :: AST.Module -> [S.Expr] -> IO AST.Module
+codegen :: AST.Module -> [Expr] -> IO AST.Module
 codegen modl fns = withContext $ \context ->
   liftError $ withModuleFromAST context newast $ \m -> do
     llstr <- moduleLLVMAssembly m
     putStrLn llstr
     return newast
-  where
-    modn    = traverse codegenTop fns
-    newast  = runLLVM modl modn
+ where
+  modn    = traverse codegenTop fns
+  newast  = runLLVM modl modn
