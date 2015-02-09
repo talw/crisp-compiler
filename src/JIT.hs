@@ -44,9 +44,6 @@ jit modl = ExceptT $ withContext $ \context ->
   withEE context $ \executionEngine ->
     runExceptT $ withModuleFromAST context modl $ \m -> do
       EE.withModuleInEngine executionEngine m $ \ee -> do
-        --TODO try to call the last main
-        --zip tail of repeat "main" with 1,2,3...
-        --map over it the getFunction, iterate it until you get Nothing
         mainfn <- EE.getFunction ee (AST.Name "main")
         case mainfn of
           Just fn -> do

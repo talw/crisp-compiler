@@ -7,7 +7,7 @@ import Data.Functor ((<$>), (<$))
 import Data.Foldable (asum)
 import qualified Lexer as LX
 import Syntax
-import Control.Applicative (liftA3, (<*>), (*>))
+import Control.Applicative (liftA3, (<*>))
 
 numberP :: Parser Expr
 numberP = NumberExp <$> (try LX.float <|>
@@ -40,20 +40,28 @@ variableP :: Parser Expr
 variableP = VarExp <$> LX.identifier
 
 defineP :: Parser Expr
-defineP = LX.parens $ DefExp
-  <$> (LX.reserved "define" *> LX.identifier)
-  <*> exprP
+defineP = parResP "define" $
+  DefExp <$> LX.identifier <*> exprP
 
 lambdaP :: Parser Expr
-lambdaP  = LX.parens $ FuncExp
-  <$> (LX.reserved "lambda" *> LX.parens (many LX.identifier))
-  <*> exprP
+lambdaP = parResP "lambda" $
+  FuncExp <$> LX.parens (many LX.identifier) <*> exprP
+
+ifP :: Parser Expr
+ifP = parResP "if" $
+  liftA3 IfExp exprP exprP exprP
+
+parResP :: String -> Parser a -> Parser a
+parResP name parser = LX.parens $ do
+  LX.reserved name
+  parser
 
 exprP :: Parser Expr
 exprP = LX.lexeme $
   try binOpP
   <|> try callP
   <|> try defineP
+  <|> try ifP
   <|> try lambdaP
   <|> try numberP
   <|> try boolP

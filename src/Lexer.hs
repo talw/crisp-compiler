@@ -13,13 +13,14 @@ import Control.Applicative ((<|>))
 
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
-  where
-    reservedNames = ["define", "lambda"] ++ map fst str2bool ++ map fst str2binOp
-    style = emptyDef {
-               Tok.commentLine   = "#"
-             , Tok.reservedNames = reservedNames
-             , Tok.identStart    = letter <|> oneOf "_#"
-             }
+ where
+  style = emptyDef
+            { Tok.commentLine   = "#"
+            , Tok.reservedNames = reservedWords
+                             ++ map fst str2bool
+                             ++ map fst str2binOp
+            , Tok.identStart    = letter <|> oneOf "_#"
+            }
 
 lexeme        = Tok.lexeme lexer
 float         = Tok.float lexer

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -17,6 +19,9 @@ import Control.Monad.State (modify, gets)
 import Codegen
 import Syntax
 import JIT
+
+false :: AST.Operand
+false = constOpr $ C.Float (F.Double 0.0)
 
 toSig :: [String] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (double, AST.Name x))
@@ -79,6 +84,34 @@ cgen (NumberExp n) = return $ constOpr $ C.Float (F.Double n)
 cgen (CallExp (GlbVarExp name) args) = do
   operands <- traverse cgen args
   call (externf (AST.Name name)) operands
+cgen (IfExp cond tr fl) = do
+  ifthen <- addBlock "if.then"
+  ifelse <- addBlock "if.else"
+  ifexit <- addBlock "if.exit"
+
+  cond <- cgen cond
+  test <- fcmp FP.ONE false cond
+  cbr test ifthen ifelse -- Branch based on the condition
+
+  (trval, ifthen) <- thenBr ifthen ifexit
+  (flval, ifelse) <- elseBr ifelse ifexit
+
+  setBlock ifexit
+  phi double [(trval, ifthen), (flval, ifelse)]
+ where
+  thenBr ifthen ifexit = do
+    setBlock ifthen
+    trval <- cgen tr
+    br ifexit
+    ifthen <- getBlock
+    return (trval, ifthen)
+  elseBr ifelse ifexit = do
+    setBlock ifelse
+    flval <- cgen fl
+    br ifexit
+    ifelse <- getBlock
+    return (flval, ifelse)
+
 cgen _ = error "cgen called with unexpected Expr"
 --cgen (S.UnaryOp op a) = cgen $ S.Call ("unary" ++ op) [a]
 --cgen (S.BinaryOp "=" (S.Var var) val) = do
@@ -100,8 +133,8 @@ codegen modl exprs = do
 
   res <- runExceptT process
   case res of
-    Right postOptiAst -> return postOptiAst
-    Left err          -> putStrLn err >> return preOptiAst
+    Right newAst -> return newAst
+    Left err     -> putStrLn err >> return preOptiAst
  where
   deltaModl  = delPrevMain >> traverse codegenTop exprs
   preOptiAst = runLLVM modl deltaModl
