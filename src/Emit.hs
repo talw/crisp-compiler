@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Emit where
 
 import qualified LLVM.General.AST as AST
+import qualified LLVM.General.AST.Global as G
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
@@ -10,6 +12,7 @@ import qualified LLVM.General.AST.FloatingPointPredicate as FP
 import Data.Traversable
 import Control.Monad.Trans.Except
 import Control.Monad
+import Control.Monad.State (modify, gets)
 
 import Codegen
 import Syntax
@@ -18,9 +21,18 @@ import JIT
 toSig :: [String] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (double, AST.Name x))
 
-{-codegenTop (Function name args body) = define double name fnargs bls-}
+delPrevMain :: LLVM ()
+delPrevMain = do
+  md <- gets AST.moduleDefinitions
+  modify $ \s -> s { AST.moduleDefinitions = filter filt md }
+ where
+  filt (AST.GlobalDefinition
+    (AST.Function { G.name = AST.Name "main", .. })) = False
+  filt _ = True
+
 codegenTop :: Expr -> LLVM ()
-codegenTop (DefExp name (FuncExp args body)) = define double name fnargs bls
+codegenTop (DefExp name (FuncExp args body)) =
+  define double name fnargs bls
  where
   fnargs = toSig args
   bls = createBlocks $ execCodegen $ do
@@ -91,5 +103,5 @@ codegen modl exprs = do
     Right postOptiAst -> return postOptiAst
     Left err          -> putStrLn err >> return preOptiAst
  where
-  deltaModl  = traverse codegenTop exprs
+  deltaModl  = delPrevMain >> traverse codegenTop exprs
   preOptiAst = runLLVM modl deltaModl
