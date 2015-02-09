@@ -2,9 +2,6 @@
 
 module Emit where
 
-import LLVM.General.Module
-import LLVM.General.Context
-
 import qualified LLVM.General.AST as AST
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
@@ -16,6 +13,7 @@ import Control.Monad
 
 import Codegen
 import Syntax
+import JIT
 
 toSig :: [String] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (double, AST.Name x))
@@ -58,14 +56,6 @@ asIRbinOp Sub = fsub
 asIRbinOp Mul = fmul
 asIRbinOp Div = fdiv
 
-{-binops :: Map.Map S.Name (AST.Operand -> AST.Operand -> Codegen AST.Operand)-}
-{-binops = Map.fromList [-}
-      {-("+", fadd)-}
-    {-, ("-", fsub)-}
-    {-, ("*", fmul)-}
-    {-, ("/", fdiv)-}
-  {-]-}
-
 cgen :: Expr -> Codegen AST.Operand
 cgen (BinOpExp op a b) = do
   ca <- cgen a
@@ -92,11 +82,11 @@ liftError :: ExceptT String IO a -> IO a
 liftError = runExceptT >=> either fail return
 
 codegen :: AST.Module -> [Expr] -> IO AST.Module
-codegen modl fns = withContext $ \context ->
-  liftError $ withModuleFromAST context newast $ \m -> do
-    llstr <- moduleLLVMAssembly m
-    putStrLn llstr
-    return newast
+codegen modl fns = do
+  res <- runJIT preOptiAst
+  case res  of
+    Right postOptiAst -> return postOptiAst
+    Left err          -> putStrLn err >> return preOptiAst
  where
-  modn    = traverse codegenTop fns
-  newast  = runLLVM modl modn
+  deltaModl  = traverse codegenTop fns
+  preOptiAst = runLLVM modl deltaModl
