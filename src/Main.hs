@@ -37,9 +37,9 @@ process modl source = do
   let res = parseExpr source
   case res of
     Left err -> print err >> return Nothing
-    Right ast -> do
-      print ast
-      modl' <- codegen modl [ast]
+    Right exprs -> do
+      print exprs
+      modl' <- codegen modl exprs
       return $ Just modl'
 
 main :: IO ()

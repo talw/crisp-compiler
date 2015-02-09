@@ -37,22 +37,21 @@ optimize modl = ExceptT $ withContext $ \context ->
       -- Return the optimized mode
       moduleAST m
 
+-- For now the jit and optimizing after separate.
+-- Even though it's less efficient, it's easier testing, that way.
 jit :: AST.Module -> ExceptT String IO AST.Module
 jit modl = ExceptT $ withContext $ \context ->
   withEE context $ \executionEngine ->
     runExceptT $ withModuleFromAST context modl $ \m -> do
-      {-withPassManager passes $ \pm -> do-}
-        -- Optimization Pass
-        {-_ <- runPassManager pm m-}
-        {-optmod <- moduleAST m-}
-        {-s <- moduleLLVMAssembly m-}
-        {-putStrLn s-}
       EE.withModuleInEngine executionEngine m $ \ee -> do
+        --TODO try to call the last main
+        --zip tail of repeat "main" with 1,2,3...
+        --map over it the getFunction, iterate it until you get Nothing
         mainfn <- EE.getFunction ee (AST.Name "main")
         case mainfn of
           Just fn -> do
             res <- run fn
             putStrLn $ "Evaluated to: " ++ show res
-          Nothing -> putStrLn "Didn't receive c function ptr from EE"
+          Nothing -> putStrLn "no main function to evaluate"
 
       return modl

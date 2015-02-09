@@ -14,7 +14,7 @@ import Control.Applicative ((<|>))
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
   where
-    reservedNames = map fst str2bool ++ map fst str2binOp
+    reservedNames = ["define", "lambda"] ++ map fst str2bool ++ map fst str2binOp
     style = emptyDef {
                Tok.commentLine   = "#"
              , Tok.reservedNames = reservedNames

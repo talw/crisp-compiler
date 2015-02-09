@@ -18,28 +18,29 @@ import JIT
 toSig :: [String] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (double, AST.Name x))
 
+{-codegenTop (Function name args body) = define double name fnargs bls-}
 codegenTop :: Expr -> LLVM ()
-codegenTop (Function name args body) = define double name fnargs bls
-  where
-    fnargs = toSig args
-    bls = createBlocks $ execCodegen $ do
-      blk <- addBlock entryBlockName
-      setBlock blk
-      for args $ \a -> do
-        var <- alloca double
-        store var (local (AST.Name a))
-        assign a var
-      cgen body >>= ret
+codegenTop (DefExp name (FuncExp args body)) = define double name fnargs bls
+ where
+  fnargs = toSig args
+  bls = createBlocks $ execCodegen $ do
+    blk <- addBlock entryBlockName
+    setBlock blk
+    for args $ \a -> do
+      var <- alloca double
+      store var (local (AST.Name a))
+      assign a var
+    cgen body >>= ret
 
 codegenTop (Extern name args) = external double name fnargs
-  where fnargs = toSig args
+ where fnargs = toSig args
 
 codegenTop expr = define double "main" [] blks
-  where
-    blks = createBlocks $ execCodegen $ do
-      blk <- addBlock entryBlockName
-      setBlock blk
-      cgen expr >>= ret
+ where
+  blks = createBlocks $ execCodegen $ do
+    blk <- addBlock entryBlockName
+    setBlock blk
+    cgen expr >>= ret
 
 -------------------------------------------------------------------------------
 -- Operations
@@ -63,9 +64,9 @@ cgen (BinOpExp op a b) = do
   asIRbinOp op ca cb
 cgen (VarExp x) = getvar x >>= load
 cgen (NumberExp n) = return $ constOpr $ C.Float (F.Double n)
-cgen (CallExp fn args) = do
+cgen (CallExp (GlbVarExp name) args) = do
   operands <- traverse cgen args
-  call (externf (AST.Name fn)) operands
+  call (externf (AST.Name name)) operands
 cgen _ = error "cgen called with unexpected Expr"
 --cgen (S.UnaryOp op a) = cgen $ S.Call ("unary" ++ op) [a]
 --cgen (S.BinaryOp "=" (S.Var var) val) = do
@@ -82,7 +83,7 @@ liftError :: ExceptT String IO a -> IO a
 liftError = runExceptT >=> either fail return
 
 codegen :: AST.Module -> [Expr] -> IO AST.Module
-codegen modl fns = do
+codegen modl exprs = do
   let process = optimize preOptiAst >>= jit
 
   res <- runExceptT process
@@ -90,5 +91,5 @@ codegen modl fns = do
     Right postOptiAst -> return postOptiAst
     Left err          -> putStrLn err >> return preOptiAst
  where
-  deltaModl  = traverse codegenTop fns
+  deltaModl  = traverse codegenTop exprs
   preOptiAst = runLLVM modl deltaModl

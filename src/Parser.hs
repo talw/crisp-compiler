@@ -5,16 +5,16 @@ import Text.Parsec.String (Parser)
 import Data.Maybe (fromJust)
 import Data.Functor ((<$>), (<$))
 import Data.Foldable (asum)
-import qualified Lexer as Lex
+import qualified Lexer as LX
 import Syntax
-import Control.Applicative (liftA3, (<*>))
+import Control.Applicative (liftA3, (<*>), (*>))
 
 numberP :: Parser Expr
-numberP = NumberExp <$> (try Lex.float <|>
-                         fromIntegral <$> Lex.integer)
+numberP = NumberExp <$> (try LX.float <|>
+                         fromIntegral <$> LX.integer)
 
 oneOfReserved :: [String] -> Parser String
-oneOfReserved = asum . map (Lex.lexeme . string)
+oneOfReserved = asum . map (LX.lexeme . string)
 
 mapP :: [(String, a)] -> Parser a
 mapP aList = fromJust . flip lookup aList <$> oneOfReserved (map fst aList)
@@ -23,35 +23,54 @@ boolP :: Parser Expr
 boolP = BoolExp <$> mapP str2bool
 
 emptyP :: Parser Expr
-emptyP = EmptyExp <$ Lex.parens eof
+emptyP = EmptyExp <$ LX.parens eof
 
 binOpP :: Parser Expr
-binOpP = Lex.parens $ liftA3 BinOpExp (mapP str2binOp)
-                                      exprP
-                                      exprP
+binOpP = LX.parens $ liftA3 BinOpExp
+  (mapP str2binOp)
+  exprP
+  exprP
 
 callP :: Parser Expr
-callP = Lex.parens $ CallExp <$> Lex.identifier <*> many exprP
+callP = LX.parens $ CallExp
+  <$> (GlbVarExp <$> LX.identifier)
+  <*> many exprP
 
 variableP :: Parser Expr
-variableP = VarExp <$> Lex.identifier
+variableP = VarExp <$> LX.identifier
+
+defineP :: Parser Expr
+defineP = LX.parens $ DefExp
+  <$> (LX.reserved "define" *> LX.identifier)
+  <*> exprP
+
+lambdaP :: Parser Expr
+lambdaP  = LX.parens $ FuncExp
+  <$> (LX.reserved "lambda" *> LX.parens (many LX.identifier))
+  <*> exprP
 
 exprP :: Parser Expr
-exprP = try binOpP
-      <|> try callP
-      <|> try numberP
-      <|> try boolP
-      <|> variableP
+exprP = LX.lexeme $
+  try binOpP
+  <|> try callP
+  <|> try defineP
+  <|> try lambdaP
+  <|> try numberP
+  <|> try boolP
+  <|> variableP
 
 contentsP :: Parser a -> Parser a
 contentsP p = do
-  Lex.whiteSpace
+  LX.whiteSpace
   r <- p
   eof
   return r
 
-parseExpr :: String -> Either ParseError Expr
-parseExpr s = parse (contentsP exprP) "<stdin>" s
+parseExpr :: String -> Either ParseError [Expr]
+parseExpr s = parse (contentsP toplevel) "<stdin>" s
+
+toplevel :: Parser [Expr]
+toplevel = many exprP
 
 {-toplevel :: Parser [Expr]-}
 {-toplevel = many $ do-}

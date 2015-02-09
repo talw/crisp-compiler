@@ -25,8 +25,10 @@ data Expr
   | EmptyExp
   | BoolExp Bool
   | VarExp String
-  | CallExp Name [Expr]
-  | Function Name [Name] Expr
+  | GlbVarExp Name
+  | DefExp Name Expr
+  | FuncExp [Name] Expr
+  | CallExp Expr [Expr]
   | Extern Name [Name]
   | BinOpExp BinOp Expr Expr
   deriving (Eq, Ord, Show)
