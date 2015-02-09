@@ -83,8 +83,10 @@ liftError = runExceptT >=> either fail return
 
 codegen :: AST.Module -> [Expr] -> IO AST.Module
 codegen modl fns = do
-  res <- runJIT preOptiAst
-  case res  of
+  let process = optimize preOptiAst >>= jit
+
+  res <- runExceptT process
+  case res of
     Right postOptiAst -> return postOptiAst
     Left err          -> putStrLn err >> return preOptiAst
  where
