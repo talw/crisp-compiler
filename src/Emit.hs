@@ -10,6 +10,8 @@ import qualified LLVM.General.AST.Global as G
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
+import LLVM.General (moduleLLVMAssembly, withModuleFromAST)
+import LLVM.General.Context (withContext)
 
 import Data.Traversable
 import Control.Monad.Trans.Except
@@ -127,11 +129,17 @@ cgen _ = error "cgen called with unexpected Expr"
 liftError :: ExceptT String IO a -> IO a
 liftError = runExceptT >=> either fail return
 
+printAsm :: AST.Module -> ExceptT String IO AST.Module
+printAsm modl = ExceptT $ withContext $ \context ->
+  runExceptT $ withModuleFromAST context modl $ \m -> do
+    putStrLn =<< moduleLLVMAssembly m
+    return modl
+
 codegen :: AST.Module -> [Expr] -> IO AST.Module
 codegen modl exprs = do
-  let process = optimize preOptiAst >>= jit
+  let process = printAsm >=> optimize >=> jit
 
-  res <- runExceptT process
+  res <- runExceptT $ process preOptiAst
   case res of
     Right newAst -> return newAst
     Left err     -> putStrLn err >> return preOptiAst

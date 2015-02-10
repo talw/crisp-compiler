@@ -33,7 +33,6 @@ optimize modl = ExceptT $ withContext $ \context ->
     withPassManager passes $ \pm -> do
       -- Optimization pass
       _ <- runPassManager pm m
-      putStrLn =<< moduleLLVMAssembly m
       -- Return the optimized mode
       moduleAST m
 
