@@ -7,6 +7,7 @@ data BinOp
   | Sub
   | Mul
   | Div
+  | Lt
   deriving (Eq, Ord, Show)
 
 str2binOp :: [(String, BinOp)]
@@ -15,6 +16,7 @@ str2binOp  =
   ,("-", Sub)
   ,("*", Mul)
   ,("/", Div)
+  ,("<", Lt)
   ]
 
 str2bool :: [(String, Bool)]

@@ -75,6 +75,7 @@ asIRbinOp Add = fadd
 asIRbinOp Sub = fsub
 asIRbinOp Mul = fmul
 asIRbinOp Div = fdiv
+asIRbinOp Lt = lt
 
 cgen :: Expr -> Codegen AST.Operand
 cgen (BinOpExp op a b) = do
