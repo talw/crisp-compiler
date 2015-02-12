@@ -33,7 +33,7 @@ reservedWords =
   ]
 
 data Expr
-  = NumberExp Double
+  = NumberExp Integer
   | EmptyExp
   | BoolExp Bool
   | VarExp String

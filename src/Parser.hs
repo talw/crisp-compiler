@@ -10,8 +10,7 @@ import Syntax
 import Control.Applicative (liftA3, (<*>))
 
 numberP :: Parser Expr
-numberP = NumberExp <$> (try LX.float <|>
-                         fromIntegral <$> LX.integer)
+numberP = NumberExp . fromIntegral <$> LX.integer
 
 oneOfReserved :: [String] -> Parser String
 oneOfReserved = asum . map (LX.lexeme . string)

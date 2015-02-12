@@ -10,6 +10,7 @@ import qualified LLVM.General.AST.Global as G
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
+import qualified LLVM.General.AST.IntegerPredicate as IP
 import LLVM.General (moduleLLVMAssembly, withModuleFromAST)
 import LLVM.General.Context (withContext)
 
@@ -24,9 +25,10 @@ import JIT
 
 false :: AST.Operand
 false = constOpr $ C.Float (F.Double 0.0)
+--TODO convert to the uint32 that represents 'false' boolean
 
 toSig :: [String] -> [(AST.Type, AST.Name)]
-toSig = map (\x -> (double, AST.Name x))
+toSig = map (\x -> (uint, AST.Name x))
 
 delPrevMain :: LLVM ()
 delPrevMain = do
@@ -46,15 +48,15 @@ codegenTop (DefExp name (FuncExp args body)) =
     blk <- addBlock entryBlockName
     setBlock blk
     for args $ \a -> do
-      var <- alloca double
+      var <- alloca uint
       store var (local (AST.Name a))
       assign a var
     cgen body >>= ret
 
-codegenTop (Extern name args) = external double name fnargs
+codegenTop (Extern name args) = external uint name fnargs
  where fnargs = toSig args
 
-codegenTop expr = define double "main" [] blks
+codegenTop expr = define uint "main" [] blks
  where
   blks = createBlocks $ execCodegen $ do
     blk <- addBlock entryBlockName
@@ -66,24 +68,22 @@ codegenTop expr = define double "main" [] blks
 -------------------------------------------------------------------------------
 
 lt :: AST.Operand -> AST.Operand -> Codegen AST.Operand
-lt a b = do
-  test <- fcmp FP.ULT a b
-  uitofp double test
+lt a b = icmp IP.ULT a b
 
 asIRbinOp :: BinOp -> AST.Operand -> AST.Operand -> Codegen AST.Operand
-asIRbinOp Add = fadd
-asIRbinOp Sub = fsub
-asIRbinOp Mul = fmul
-asIRbinOp Div = fdiv
+asIRbinOp Add = iadd
+asIRbinOp Sub = isub
+asIRbinOp Mul = imul
+asIRbinOp Div = idiv
 asIRbinOp Lt = lt
 
 cgen :: Expr -> Codegen AST.Operand
+cgen (VarExp x) = getvar x >>= load
+cgen (NumberExp n) = return $ constOpr $ C.Int uintSize n
 cgen (BinOpExp op a b) = do
   ca <- cgen a
   cb <- cgen b
   asIRbinOp op ca cb
-cgen (VarExp x) = getvar x >>= load
-cgen (NumberExp n) = return $ constOpr $ C.Float (F.Double n)
 cgen (CallExp (GlbVarExp name) args) = do
   operands <- traverse cgen args
   call (externf (AST.Name name)) operands
@@ -93,14 +93,14 @@ cgen (IfExp cond tr fl) = do
   ifexit <- addBlock "if.exit"
 
   cond <- cgen cond
-  test <- fcmp FP.ONE false cond
+  test <- icmp IP.NE false cond
   cbr test ifthen ifelse -- Branch based on the condition
 
   (trval, ifthen) <- thenBr ifthen ifexit
   (flval, ifelse) <- elseBr ifelse ifexit
 
   setBlock ifexit
-  phi double [(trval, ifthen), (flval, ifelse)]
+  phi uint [(trval, ifthen), (flval, ifelse)]
  where
   thenBr ifthen ifexit = do
     setBlock ifthen
