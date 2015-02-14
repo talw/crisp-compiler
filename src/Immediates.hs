@@ -5,6 +5,7 @@ import Data.Word
 import Data.List (elemIndex)
 import Data.Bool (bool)
 import Debug.Trace (traceId, traceShowId)
+import Data.Char (chr)
 
 data ImmediateType
   = Fixnum
@@ -24,6 +25,9 @@ shiftWidthOfFormat = negate . length . takeWhile (/= '*') . reverse
 fixnumFormat :: String
 fixnumFormat  = "00"
 
+charFormat :: String
+charFormat  = "00001111"
+
 boolFormat :: String
 boolFormat = "0*101111"
 
@@ -35,6 +39,7 @@ showImmediate :: Word32 -> String
 showImmediate n =
   handleValueOfType [ (boolFormat, bool "#f" "#t" . (/= 0))
                     , (fixnumFormat, show)
+                    , (charFormat, \n -> "#\\" ++ [chr $ fromIntegral n])
                     ]
  where
   handleValueOfType :: [(String, Word32 -> String)] -> String
@@ -69,7 +74,7 @@ convertBase :: Integral a => a -> a -> a -> a
 convertBase fromBase toBase = convertDec 10 toBase . convertDec fromBase 10
   where convertDec fb tb n = go n 1
           where go 0 _ = 0
-                go x fac = if lsb `elem` [0..(min fb tb)-1]
+                go x fac = if lsb `elem` [0..min fb tb - 1]
                              then addition + go (x `div` tb) (fac*fb)
                              else error "convertBase - invalid character"
                   where lsb = x `mod` tb
