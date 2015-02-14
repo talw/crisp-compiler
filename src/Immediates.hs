@@ -7,9 +7,10 @@ where
 
 import Data.Bits
 import Data.Word
-import Data.List (elemIndex)
 import Data.Bool (bool)
 import Data.Char (chr, ord)
+
+import Utils
 
 data ImmediateType
   = Fixnum
@@ -68,31 +69,3 @@ showImmediate n =
 
 
 
-
-{-import Utils-}
-tr :: [Char] -> [Char] -> String -> String
-tr as bs str = flip map str $
-  \c -> maybe c (\ix -> bs !! ix) $ elemIndex c as
-
-readBinary :: String -> Word32
-readBinary = bin2dec . read
-
-bin2dec :: Word32 -> Word32
-bin2dec = convertBase 2 10
-
-convertBase :: Integral a => a -> a -> a -> a
-convertBase fromBase toBase = convertDec 10 toBase . convertDec fromBase 10
-  where convertDec fb tb n = go n 1
-          where go 0 _ = 0
-                go x fac = if lsb `elem` [0..min fb tb - 1]
-                             then addition + go (x `div` tb) (fac*fb)
-                             else error "convertBase - invalid character"
-                  where lsb = x `mod` tb
-                        addition = lsb*fac
-
-{-boolMask,boolMasked :: Word32-}
-{-boolMask = maskOfFormat boolFormat-}
-{-boolMasked = readBinary $ tr "*" "0" boolFormat-}
-{-fixnumMask,fixnumMasked :: Word32-}
-{-fixnumMask = maskOfFormat fixnumFormat-}
-{-fixnumMasked = readBinary $ tr "*" "0" fixnumFormat-}
