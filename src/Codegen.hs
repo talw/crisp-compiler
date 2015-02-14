@@ -258,6 +258,9 @@ fdiv a b = instr $ FDiv NoFastMathFlags a b []
 fcmp :: FP.FloatingPointPredicate -> Operand -> Operand -> Codegen Operand
 fcmp cond a b = instr $ FCmp cond a b []
 
+constUint :: Integral i => i -> Operand
+constUint = constOpr . C.Int uintSize . fromIntegral
+
 constOpr :: C.Constant -> Operand
 constOpr = ConstantOperand
 

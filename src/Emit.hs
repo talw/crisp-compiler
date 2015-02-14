@@ -22,10 +22,11 @@ import Control.Monad.State (modify, gets)
 import Codegen
 import Syntax
 import JIT
+import Immediates hiding (false, true)
+import qualified Immediates as IM
 
 false :: AST.Operand
-false = constOpr $ C.Float (F.Double 0.0)
---TODO convert to the uint32 that represents 'false' boolean
+false = constOpr . C.Int uintSize . fromIntegral $ IM.false
 
 toSig :: [String] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (uint, AST.Name x))
@@ -78,15 +79,24 @@ asIRbinOp Div = idiv
 asIRbinOp Lt = lt
 
 cgen :: Expr -> Codegen AST.Operand
+
 cgen (VarExp x) = getvar x >>= load
-cgen (NumberExp n) = return $ constOpr $ C.Int uintSize n
+
+cgen (BoolExp True) = return . constUint $ IM.true
+cgen (BoolExp False) = return . constUint $ IM.false
+
+cgen (NumberExp n) = return . constUint $ n'
+  where n' = shift n . shiftWidthOfFormat $ fixnumFormat
+
 cgen (BinOpExp op a b) = do
   ca <- cgen a
   cb <- cgen b
   asIRbinOp op ca cb
+
 cgen (CallExp (GlbVarExp name) args) = do
   operands <- traverse cgen args
   call (externf (AST.Name name)) operands
+
 cgen (IfExp cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"

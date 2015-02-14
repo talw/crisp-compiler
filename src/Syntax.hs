@@ -21,8 +21,8 @@ str2binOp  =
 
 str2bool :: [(String, Bool)]
 str2bool =
-  [("T", True)
-  ,("F", False)
+  [("#t", True)
+  ,("#f", False)
   ]
 
 reservedWords :: [String]

@@ -1,10 +1,14 @@
-module Immediates where
+module Immediates
+  ( module Data.Bits
+  , module Immediates
+  )
+
+where
 
 import Data.Bits
 import Data.Word
 import Data.List (elemIndex)
 import Data.Bool (bool)
-import Debug.Trace (traceId, traceShowId)
 import Data.Char (chr)
 
 data ImmediateType
@@ -20,7 +24,7 @@ formatMasked :: String -> Word32
 formatMasked  = readBinary . tr "*" "0"
 
 shiftWidthOfFormat :: String -> Int
-shiftWidthOfFormat = negate . length . takeWhile (/= '*') . reverse
+shiftWidthOfFormat = length . takeWhile (/= '*') . reverse
 
 fixnumFormat, charFormat, nilFormat, boolFormat :: String
 fixnumFormat =       "00"
@@ -36,7 +40,7 @@ showImmediate :: Word32 -> String
 showImmediate n =
   handleValueOfType [ (boolFormat, bool "#f" "#t" . (/= 0))
                     , (fixnumFormat, show)
-                    , (charFormat, \n -> "#\\" ++ [chr $ fromIntegral n])
+                    , (charFormat, \i -> "#\\" ++ [chr $ fromIntegral i])
                     , (nilFormat, const "()")
                     ]
  where
@@ -48,7 +52,7 @@ showImmediate n =
       | outputVal /= "" = outputVal
       | applyMask mask == formatMasked format =
         let actualValue = shift (complement mask .&. n)
-                                (shiftWidthOfFormat format)
+                                (negate . shiftWidthOfFormat $ format)
         in handler actualValue
       | otherwise = ""
      where

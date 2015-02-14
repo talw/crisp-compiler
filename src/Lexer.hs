@@ -15,7 +15,7 @@ lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
  where
   style = emptyDef
-            { Tok.commentLine   = "#"
+            { Tok.commentLine   = ";"
             , Tok.reservedNames = reservedWords
                              ++ map fst str2bool
                              ++ map fst str2binOp
