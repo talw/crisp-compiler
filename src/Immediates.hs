@@ -22,14 +22,11 @@ formatMasked  = readBinary . tr "*" "0"
 shiftWidthOfFormat :: String -> Int
 shiftWidthOfFormat = negate . length . takeWhile (/= '*') . reverse
 
-fixnumFormat :: String
-fixnumFormat  = "00"
-
-charFormat :: String
-charFormat  = "00001111"
-
-boolFormat :: String
-boolFormat = "0*101111"
+fixnumFormat, charFormat, nilFormat, boolFormat :: String
+fixnumFormat =       "00"
+charFormat   = "00001111"
+nilFormat    = "00111111"
+boolFormat   = "0*101111"
 
 true, false :: Word32
 true = readBinary $ tr "*" "1" boolFormat
@@ -40,6 +37,7 @@ showImmediate n =
   handleValueOfType [ (boolFormat, bool "#f" "#t" . (/= 0))
                     , (fixnumFormat, show)
                     , (charFormat, \n -> "#\\" ++ [chr $ fromIntegral n])
+                    , (nilFormat, const "()")
                     ]
  where
   handleValueOfType :: [(String, Word32 -> String)] -> String
