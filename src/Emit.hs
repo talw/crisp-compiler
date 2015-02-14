@@ -15,6 +15,7 @@ import LLVM.General (moduleLLVMAssembly, withModuleFromAST)
 import LLVM.General.Context (withContext)
 
 import Data.Traversable
+import Data.Char (ord)
 import Control.Monad.Trans.Except
 import Control.Monad
 import Control.Monad.State (modify, gets)
@@ -85,8 +86,9 @@ cgen (VarExp x) = getvar x >>= load
 cgen (BoolExp True) = return . constUint $ IM.true
 cgen (BoolExp False) = return . constUint $ IM.false
 
-cgen (NumberExp n) = return . constUint $ n'
-  where n' = shift n . shiftWidthOfFormat $ fixnumFormat
+cgen (NumberExp n) = return . constUint . toFixnum $ n
+
+cgen (CharExp c) = return . constUint . toChar $ c
 
 cgen (BinOpExp op a b) = do
   ca <- cgen a

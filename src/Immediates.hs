@@ -9,7 +9,7 @@ import Data.Bits
 import Data.Word
 import Data.List (elemIndex)
 import Data.Bool (bool)
-import Data.Char (chr)
+import Data.Char (chr, ord)
 
 data ImmediateType
   = Fixnum
@@ -31,6 +31,14 @@ fixnumFormat =       "00"
 charFormat   = "00001111"
 nilFormat    = "00111111"
 boolFormat   = "0*101111"
+
+toFixnum :: Integer -> Integer
+toFixnum = flip shift . shiftWidthOfFormat $ fixnumFormat
+
+toChar :: Char -> Word32
+toChar = (.|. formatMasked charFormat)
+  . flip shift (shiftWidthOfFormat charFormat)
+  . fromIntegral . ord
 
 true, false :: Word32
 true = readBinary $ tr "*" "1" boolFormat

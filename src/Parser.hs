@@ -7,7 +7,7 @@ import Data.Functor ((<$>), (<$))
 import Data.Foldable (asum)
 import qualified Lexer as LX
 import Syntax
-import Control.Applicative (liftA3, (<*>))
+import Control.Applicative (liftA3, (<*>), (*>))
 
 numberP :: Parser Expr
 numberP = NumberExp . fromIntegral <$> LX.integer
@@ -17,6 +17,9 @@ oneOfReserved = asum . map (LX.lexeme . string)
 
 mapP :: [(String, a)] -> Parser a
 mapP aList = fromJust . flip lookup aList <$> oneOfReserved (map fst aList)
+
+charP :: Parser Expr
+charP = CharExp <$> (string "#\\" *> anyChar)
 
 boolP :: Parser Expr
 boolP = BoolExp <$> mapP str2bool
@@ -64,6 +67,7 @@ exprP = LX.lexeme $
   <|> try lambdaP
   <|> try numberP
   <|> try boolP
+  <|> try charP
   <|> variableP
 
 contentsP :: Parser a -> Parser a

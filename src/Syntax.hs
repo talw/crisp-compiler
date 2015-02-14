@@ -35,6 +35,7 @@ reservedWords =
 data Expr
   = NumberExp Integer
   | EmptyExp
+  | CharExp Char
   | BoolExp Bool
   | VarExp String
   | GlbVarExp Name
