@@ -13,18 +13,24 @@ import qualified LLVM.General.AST.FloatingPointPredicate as FP
 import qualified LLVM.General.AST.IntegerPredicate as IP
 import LLVM.General (moduleLLVMAssembly, withModuleFromAST)
 import LLVM.General.Context (withContext)
+import LLVM.General.Module
+import LLVM.General.Diagnostic (Diagnostic(..))
 
 import Data.Traversable
-import Data.Char (ord)
+import Data.Functor ((<$>))
 import Control.Monad.Trans.Except
 import Control.Monad
 import Control.Monad.State (modify, gets)
+import Control.Monad.IO.Class (liftIO)
 
 import Codegen
 import Syntax
 import JIT
 import Immediates hiding (false, true)
 import qualified Immediates as IM
+
+import Paths_lc_hs (getDataDir)
+import System.FilePath ((</>))
 
 false :: AST.Operand
 false = constOpr . C.Int uintSize . fromIntegral $ IM.false
@@ -55,15 +61,16 @@ codegenTop (DefExp name (FuncExp args body)) =
       assign a var
     cgen body >>= ret
 
-codegenTop (Extern name args) = external uint name fnargs
- where fnargs = toSig args
-
 codegenTop expr = define uint "main" [] blks
  where
   blks = createBlocks $ execCodegen $ do
     blk <- addBlock entryBlockName
     setBlock blk
     cgen expr >>= ret
+
+codegenExterns :: LLVM ()
+codegenExterns {-(Extern name args)-} = external uint "isBoolean" fnargs
+ where fnargs = toSig ["val"]
 
 -------------------------------------------------------------------------------
 -- Operations
@@ -138,6 +145,23 @@ cgen _ = error "cgen called with unexpected Expr"
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
+
+initModule :: String -> IO (Either String AST.Module)
+initModule label = withContext $ \context -> do
+  dataDir <- getDataDir
+  let primModFilePath = File $ dataDir </> "c-src/try.ll"
+  result <- runExceptT . withModuleFromLLVMAssembly context primModFilePath $
+              \primitivesMod -> (join <$>) . runExceptT . withModuleFromAST context initialModAST $
+                \initialMod -> runExceptT $ do
+                  linkModules False initialMod primitivesMod
+                  liftIO $ moduleAST initialMod
+  return $ either (Left . show) id result
+ where
+  initialModAST = runLLVM
+                    (AST.defaultModule { AST.moduleName = label })
+                    codegenExterns
+                    {-(return ())-}
+
 
 liftError :: ExceptT String IO a -> IO a
 liftError = runExceptT >=> either fail return

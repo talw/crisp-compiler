@@ -43,6 +43,6 @@ data Expr
   | IfExp Expr Expr Expr
   | FuncExp [Name] Expr
   | CallExp Expr [Expr]
-  | Extern Name [Name]
+  {-| Extern Name [Name]-}
   | BinOpExp BinOp Expr Expr
   deriving (Eq, Ord, Show)

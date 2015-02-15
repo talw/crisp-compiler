@@ -2,7 +2,7 @@ module Main where
 
 import Parser
 import Emit
-import Codegen
+{-import Codegen-}
 
 import System.Console.Haskeline
 import System.Environment (getArgs)
@@ -12,14 +12,11 @@ import Data.Functor (void)
 import Control.Monad.IO.Class (liftIO)
 
 
-initModule :: AST.Module
-initModule = emptyModule "Default initial module"
+processFile :: FilePath -> AST.Module -> IO (Maybe AST.Module)
+processFile fname initMod = readFile fname >>= process initMod
 
-processFile :: FilePath -> IO (Maybe AST.Module)
-processFile fname = readFile fname >>= process initModule
-
-repl :: IO ()
-repl = runInputT defaultSettings (loop initModule)
+repl :: AST.Module -> IO ()
+repl initMod = runInputT defaultSettings . loop $ initMod
  where loop modl = do
          minput <- getInputLine "ready> "
          case minput of
@@ -45,9 +42,13 @@ process modl source = do
 main :: IO ()
 main = do
   args <- getArgs
-  case args of
-    []      -> repl
-    fname : _ -> void $ processFile fname
+  emod <- initModule "default module"
+  case emod of
+    Left err -> putStrLn err
+    Right mod ->
+      case args of
+        []      -> repl mod
+        fname : _ -> void $ processFile fname mod
 
 {-process :: AST.Module -> String -> IO (Maybe AST.Module)-}
 {-process modl source = do-}
