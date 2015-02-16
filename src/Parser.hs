@@ -13,7 +13,7 @@ numberP :: Parser Expr
 numberP = NumberExp . fromIntegral <$> LX.integer
 
 oneOfReserved :: [String] -> Parser String
-oneOfReserved = asum . map (LX.lexeme . string)
+oneOfReserved = asum . map LX.reserved
 
 mapP :: [(String, a)] -> Parser a
 mapP aList = fromJust . flip lookup aList <$> oneOfReserved (map fst aList)

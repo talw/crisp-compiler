@@ -160,7 +160,6 @@ initModule label = withContext $ \context -> do
   initialModAST = runLLVM
                     (AST.defaultModule { AST.moduleName = label })
                     codegenExterns
-                    {-(return ())-}
 
 
 liftError :: ExceptT String IO a -> IO a
