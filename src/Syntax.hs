@@ -30,6 +30,8 @@ reservedWords =
   ["define"
   ,"lambda"
   ,"if"
+  ,"and"
+  ,"or"
   ]
 
 data Expr

@@ -7,7 +7,7 @@ import Data.Functor ((<$>), (<$))
 import Data.Foldable (asum)
 import qualified Lexer as LX
 import Syntax
-import Control.Applicative (liftA3, (<*>), (*>))
+import Control.Applicative (liftA3, (<*>), (*>), pure)
 
 numberP :: Parser Expr
 numberP = NumberExp . fromIntegral <$> LX.integer
@@ -42,19 +42,26 @@ variableP :: Parser Expr
 variableP = VarExp <$> LX.identifier
 
 defineP :: Parser Expr
-defineP = parResP "define" $
+defineP = reservedFuncP "define" $
   DefExp <$> LX.identifier <*> exprP
 
 lambdaP :: Parser Expr
-lambdaP = parResP "lambda" $
+lambdaP = reservedFuncP "lambda" $
   FuncExp <$> LX.parens (many LX.identifier) <*> exprP
 
 ifP :: Parser Expr
-ifP = parResP "if" $
+ifP = reservedFuncP "if" $
   liftA3 IfExp exprP exprP exprP
 
-parResP :: String -> Parser a -> Parser a
-parResP name parser = LX.parens $ do
+andP :: Parser Expr
+andP = reservedFuncP "and" go
+ where
+  go = do
+    expr <- exprP
+    liftA3 IfExp (pure expr) go (pure (BoolExp False)) <|> return expr
+
+reservedFuncP :: String -> Parser a -> Parser a
+reservedFuncP name parser = LX.parens $ do
   LX.reserved name
   parser
 
@@ -64,6 +71,7 @@ exprP = LX.lexeme $
   <|> try callP
   <|> try defineP
   <|> try ifP
+  <|> try andP
   <|> try lambdaP
   <|> try numberP
   <|> try boolP
