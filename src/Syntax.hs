@@ -40,7 +40,6 @@ data Expr
   | EmptyExp
   | CharExp Char
   | BoolExp Bool
-  | NotExp Expr
   | VarExp String
   | GlbVarExp Name
   | DefExp Name Expr
