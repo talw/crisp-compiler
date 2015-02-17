@@ -219,13 +219,13 @@ getvar var = do
 
 -- References
 local ::  Name -> Operand
-local = LocalReference double
+local = LocalReference uint
 
 global ::  Name -> C.Constant
-global = C.GlobalReference double
+global = C.GlobalReference uint
 
 externf :: Name -> Operand
-externf = ConstantOperand . C.GlobalReference double
+externf = ConstantOperand . C.GlobalReference uint
 
 -- Arithmetic and Constants
 iadd :: Operand -> Operand -> Codegen Operand

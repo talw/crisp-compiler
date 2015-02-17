@@ -53,6 +53,11 @@ ifP :: Parser Expr
 ifP = reservedFuncP "if" $
   liftA3 IfExp exprP exprP exprP
 
+notP :: Parser Expr
+notP = reservedFuncP "not" $ do
+  expr <- exprP
+  return $ IfExp expr (BoolExp False) (BoolExp True)
+
 andP :: Parser Expr
 andP = reservedFuncP "and" go
  where
@@ -65,12 +70,14 @@ reservedFuncP name parser = LX.parens $ do
   LX.reserved name
   parser
 
+--TODO refactor this
 exprP :: Parser Expr
 exprP = LX.lexeme $
   try binOpP
   <|> try callP
   <|> try defineP
   <|> try ifP
+  <|> try notP
   <|> try andP
   <|> try lambdaP
   <|> try numberP

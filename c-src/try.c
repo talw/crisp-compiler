@@ -32,14 +32,6 @@ unsigned isNumber (unsigned val)
   return isTag (val, 0, 2);
 }
 
-unsigned not (unsigned val)
-{
-  if (val == FALSE_VALUE)
-    return TRUE_VALUE;
-  else
-    return FALSE_VALUE;
-}
-
 /*int main(int argc, char *argv[])*/
 /*{*/
   /*printf("%d\n", isChar(24847));*/
