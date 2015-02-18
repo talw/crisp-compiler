@@ -78,21 +78,21 @@ reservedFuncP name parser = LX.parens $ do
   LX.reserved name
   parser
 
---TODO refactor this
 exprP :: Parser Expr
-exprP = LX.lexeme $
-  try binOpP
-  <|> try callP
-  <|> try defineP
-  <|> try ifP
-  <|> try notP
-  <|> try andP
-  <|> try orP
-  <|> try lambdaP
-  <|> try numberP
-  <|> try boolP
-  <|> try charP
-  <|> variableP
+exprP = LX.lexeme . asum . map try $
+  [ binOpP
+  , callP
+  , defineP
+  , ifP
+  , notP
+  , andP
+  , orP
+  , lambdaP
+  , numberP
+  , boolP
+  , charP
+  , variableP
+  ]
 
 contentsP :: Parser a -> Parser a
 contentsP p = do
