@@ -4,7 +4,9 @@ import Text.Parsec
 import Text.Parsec.String (Parser)
 import Data.Maybe (fromJust)
 import Data.Functor ((<$>), (<$))
+import Data.Function (on)
 import Data.Foldable (asum)
+import Data.List (sortBy)
 import qualified Lexer as LX
 import Syntax
 import Control.Applicative (liftA3, (<*>), (*>), pure)
@@ -13,7 +15,7 @@ numberP :: Parser Expr
 numberP = NumberExp . fromIntegral <$> LX.integer
 
 oneOfReserved :: [String] -> Parser String
-oneOfReserved = asum . map LX.reserved
+oneOfReserved = asum . map LX.reserved . sortBy (flip compare `on` length)
 
 mapP :: [(String, a)] -> Parser a
 mapP aList = fromJust . flip lookup aList <$> oneOfReserved (map fst aList)

@@ -77,11 +77,12 @@ codegenExterns {-(Extern name args)-} = external uint "isBoolean" fnargs
 -- Operations
 -------------------------------------------------------------------------------
 
-lt :: AST.Operand -> AST.Operand -> Codegen AST.Operand
-lt a b = do
-  res        <- zext uint =<< icmp IP.ULT a b
-  resShifted <- shl res (constUint $ shiftWidthOfFormat boolFormat)
-  CG.or resShifted (constUint $ formatMasked boolFormat)
+comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
+comp ip a b = do
+  res        <- zext uint =<< icmp ip a b
+  resShifted <- shl res . constUint $ shiftWidthOfFormat boolFormat
+  CG.or resShifted . constUint $ formatMasked boolFormat
+
 
 asIRbinOp :: BinOp -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 asIRbinOp Add = iadd
@@ -89,6 +90,11 @@ asIRbinOp Sub = isub
 asIRbinOp Mul = imul
 asIRbinOp Div = idiv
 asIRbinOp Lt  = lt
+asIRbinOp Lt  = comp IP.ULT
+asIRbinOp Lte  = comp IP.ULE
+asIRbinOp Gt   = comp IP.UGT
+asIRbinOp Gte  = comp IP.UGE
+asIRbinOp Eq   = comp IP.EQ
 
 cgen :: Expr -> Codegen AST.Operand
 

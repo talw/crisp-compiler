@@ -8,15 +8,23 @@ data BinOp
   | Mul
   | Div
   | Lt
+  | Lte
+  | Gt
+  | Gte
+  | Eq
   deriving (Eq, Ord, Show)
 
 str2binOp :: [(String, BinOp)]
 str2binOp  =
-  [("+", Add)
-  ,("-", Sub)
-  ,("*", Mul)
-  ,("/", Div)
-  ,("<", Lt)
+  [ ("+"  , Add)
+  , ("-"  , Sub)
+  , ("*"  , Mul)
+  , ("/"  , Div)
+  , ("<"  , Lt)
+  , ("<=" , Lte)
+  , (">"  , Gt)
+  , (">=" , Gte)
+  , ("="  , Eq)
   ]
 
 str2bool :: [(String, Bool)]
