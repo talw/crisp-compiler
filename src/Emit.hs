@@ -24,6 +24,7 @@ import Control.Monad.State (modify, gets)
 import Control.Monad.IO.Class (liftIO)
 
 import Codegen
+import qualified Codegen as CG
 import Syntax
 import JIT
 import Immediates hiding (false, true)
@@ -77,14 +78,17 @@ codegenExterns {-(Extern name args)-} = external uint "isBoolean" fnargs
 -------------------------------------------------------------------------------
 
 lt :: AST.Operand -> AST.Operand -> Codegen AST.Operand
-lt a b = icmp IP.ULT a b
+lt a b = do
+  res        <- zext uint =<< icmp IP.ULT a b
+  resShifted <- shl res (constUint $ shiftWidthOfFormat boolFormat)
+  CG.or resShifted (constUint $ formatMasked boolFormat)
 
 asIRbinOp :: BinOp -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 asIRbinOp Add = iadd
 asIRbinOp Sub = isub
 asIRbinOp Mul = imul
 asIRbinOp Div = idiv
-asIRbinOp Lt = lt
+asIRbinOp Lt  = lt
 
 cgen :: Expr -> Codegen AST.Operand
 

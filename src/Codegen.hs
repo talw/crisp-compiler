@@ -267,6 +267,15 @@ constOpr = ConstantOperand
 uitofp :: Type -> Operand -> Codegen Operand
 uitofp ty a = instr $ UIToFP a ty []
 
+zext :: Type -> Operand -> Codegen Operand
+zext ty a = instr $ ZExt a ty []
+
+shl :: Operand -> Operand -> Codegen Operand
+shl a shiftSize = instr $ Shl False False a shiftSize []
+
+or :: Operand -> Operand -> Codegen Operand
+or a b = instr $ Or a b []
+
 toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
 toArgs = map (\x -> (x, []))
 

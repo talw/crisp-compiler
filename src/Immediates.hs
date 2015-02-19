@@ -34,7 +34,7 @@ nilFormat    = "00111111"
 boolFormat   = "0*101111"
 
 toFixnum :: Integer -> Integer
-toFixnum = flip shift . shiftWidthOfFormat $ fixnumFormat
+toFixnum = flip shift $ shiftWidthOfFormat fixnumFormat
 
 toChar :: Char -> Word32
 toChar = (.|. formatMasked charFormat)
