@@ -273,6 +273,9 @@ zext ty a = instr $ ZExt a ty []
 shl :: Operand -> Operand -> Codegen Operand
 shl a shiftSize = instr $ Shl False False a shiftSize []
 
+shr :: Operand -> Operand -> Codegen Operand
+shr a shiftSize = instr $ LShr False a shiftSize []
+
 or :: Operand -> Operand -> Codegen Operand
 or a b = instr $ Or a b []
 

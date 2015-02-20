@@ -83,13 +83,20 @@ comp ip a b = do
   resShifted <- shl res . constUint $ shiftWidthOfFormat boolFormat
   CG.or resShifted . constUint $ formatMasked boolFormat
 
+binArithOp :: (AST.Operand -> AST.Operand -> Codegen AST.Operand)
+           -> AST.Operand -> AST.Operand -> Codegen AST.Operand
+binArithOp op a b = do
+  a' <- shr a . constUint $ shiftWidthOfFormat fixnumFormat
+  b' <- shr b . constUint $ shiftWidthOfFormat fixnumFormat
+  res <- op a' b'
+  resShifted <- shl res . constUint $ shiftWidthOfFormat fixnumFormat
+  CG.or resShifted . constUint $ formatMasked fixnumFormat
 
 asIRbinOp :: BinOp -> AST.Operand -> AST.Operand -> Codegen AST.Operand
-asIRbinOp Add = iadd
-asIRbinOp Sub = isub
-asIRbinOp Mul = imul
-asIRbinOp Div = idiv
-asIRbinOp Lt  = lt
+asIRbinOp Add = binArithOp iadd
+asIRbinOp Sub = binArithOp isub
+asIRbinOp Mul = binArithOp imul
+asIRbinOp Div = binArithOp idiv
 asIRbinOp Lt  = comp IP.ULT
 asIRbinOp Lte  = comp IP.ULE
 asIRbinOp Gt   = comp IP.UGT
