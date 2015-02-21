@@ -11,10 +11,12 @@ import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
 import qualified LLVM.General.AST.IntegerPredicate as IP
+import LLVM.General.AST.Type (ptr)
 import LLVM.General (moduleLLVMAssembly, withModuleFromAST)
 import LLVM.General.Context (withContext)
 import LLVM.General.Module
 import LLVM.General.Diagnostic (Diagnostic(..))
+import LLVM.General.Target (withDefaultTargetMachine)
 
 import Data.Traversable
 import Data.Functor ((<$>))
@@ -45,12 +47,12 @@ delPrevMain = do
   modify $ \s -> s { AST.moduleDefinitions = filter filt md }
  where
   filt (AST.GlobalDefinition
-    (AST.Function { G.name = AST.Name "main", .. })) = False
+    (AST.Function { G.name = AST.Name "entryFunc", .. })) = False
   filt _ = True
 
 codegenTop :: Expr -> LLVM ()
 codegenTop (DefExp name (FuncExp args body)) =
-  define double name fnargs bls
+  define uint name fnargs bls
  where
   fnargs = toSig args
   bls = createBlocks $ execCodegen $ do
@@ -62,7 +64,7 @@ codegenTop (DefExp name (FuncExp args body)) =
       assign a var
     cgen body >>= ret
 
-codegenTop expr = define uint "main" [] blks
+codegenTop expr = define uint "entryFunc" [] blks
  where
   blks = createBlocks $ execCodegen $ do
     blk <- addBlock entryBlockName
@@ -70,8 +72,8 @@ codegenTop expr = define uint "main" [] blks
     cgen expr >>= ret
 
 codegenExterns :: LLVM ()
-codegenExterns {-(Extern name args)-} = external uint "isBoolean" fnargs
- where fnargs = toSig ["val"]
+codegenExterns {-(Extern name args)-} = external (ptr $ AST.IntegerType 8) "malloc" fnargs
+ where fnargs = toSig ["size"]
 
 -------------------------------------------------------------------------------
 -- Operations
@@ -179,8 +181,13 @@ initModule label = withContext $ \context -> do
                     codegenExterns
 
 
-liftError :: ExceptT String IO a -> IO a
-liftError = runExceptT >=> either fail return
+{-writeTargetCode :: FilePath -> AST.Module -> IO (Either String ())-}
+writeTargetCode :: FilePath -> AST.Module -> ExceptT String IO ()
+writeTargetCode fn astMod = ExceptT $
+  withContext $ \context ->
+    fmap join . runExceptT . withModuleFromAST context astMod $ \mod ->
+      fmap join . runExceptT . withDefaultTargetMachine $ \target ->
+        runExceptT $ writeObjectToFile target (File $ fn ++ ".o") mod
 
 printAsm :: AST.Module -> ExceptT String IO AST.Module
 printAsm modl = ExceptT $ withContext $ \context ->
