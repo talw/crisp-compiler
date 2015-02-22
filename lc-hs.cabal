@@ -15,7 +15,7 @@ build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
 
-data-files:          c-src/try.ll
+data-files:          c-src/primitives.ll
                      c-src/driver.ll
 
 executable lc-hs

@@ -168,7 +168,7 @@ cgen _ = error "cgen called with unexpected Expr"
 initModule :: String -> IO (Either String AST.Module)
 initModule label = withContext $ \context -> do
   dataDir <- getDataDir
-  let primModFilePath = File $ dataDir </> "c-src/try.ll"
+  let primModFilePath = File $ dataDir </> "c-src/primitives.ll"
       driverModFilePath = File $ dataDir </> "c-src/driver.ll"
   runExceptT $
     linkModule primModFilePath >=> linkModule driverModFilePath
