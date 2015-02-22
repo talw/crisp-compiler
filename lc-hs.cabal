@@ -16,6 +16,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 data-files:          c-src/try.ll
+                     c-src/driver.ll
 
 executable lc-hs
   main-is:             Main.hs

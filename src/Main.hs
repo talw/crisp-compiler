@@ -59,14 +59,3 @@ compile fname astMod = do
     Left err -> putStrLn err
     Right () -> putStrLn "Compiled successfully."
 
-
-
-{-process :: AST.Module -> String -> IO (Maybe AST.Module)-}
-{-process modl source = do-}
-  {-let ast = parseExpr source-}
-  {-case ast of-}
-    {-Left err -> print err >> return Nothing-}
-    {-Right ex -> do-}
-      {-ast <- codegen modo ex-}
-      {-return $ Just ast-}
-

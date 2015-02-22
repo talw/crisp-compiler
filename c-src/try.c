@@ -1,12 +1,11 @@
-#include<stdio.h>
-#include<math.h>
+#include <stdio.h>
+#include <math.h>
 
-const int TRUE_VALUE = 0x6F;
-const int FALSE_VALUE = 0x2F;
+#include "constants.h"
 
 unsigned isBoolean (unsigned val)
 {
-  if (val == 0x2F || val == 0x6F)
+  if (val == FALSE_VALUE || val == TRUE_VALUE)
     return TRUE_VALUE;
   else
     return FALSE_VALUE;
@@ -24,12 +23,12 @@ unsigned isTag (unsigned val, unsigned tag, unsigned tagLen)
 
 unsigned isChar (unsigned val)
 {
-  return isTag (val, 0x0F, 8);
+  return isTag (val, CHAR_TAG, 8);
 }
 
 unsigned isNumber (unsigned val)
 {
-  return isTag (val, 0, 2);
+  return isTag (val, FIXNUM_TAG, 2);
 }
 
 /*int main(int argc, char *argv[])*/

@@ -169,19 +169,24 @@ initModule :: String -> IO (Either String AST.Module)
 initModule label = withContext $ \context -> do
   dataDir <- getDataDir
   let primModFilePath = File $ dataDir </> "c-src/try.ll"
-  result <- runExceptT . withModuleFromLLVMAssembly context primModFilePath $
-              \primitivesMod -> (join <$>) . runExceptT . withModuleFromAST context initialModAST $
-                \initialMod -> runExceptT $ do
-                  linkModules False initialMod primitivesMod
-                  liftIO $ moduleAST initialMod
-  return $ either (Left . show) id result
+      driverModFilePath = File $ dataDir </> "c-src/driver.ll"
+  runExceptT $
+    linkModule primModFilePath >=> linkModule driverModFilePath
+    $ initialModAST
  where
   initialModAST = runLLVM
                     (AST.defaultModule { AST.moduleName = label })
                     codegenExterns
 
+linkModule :: File -> AST.Module -> ExceptT String IO AST.Module
+linkModule fp modlAST = ExceptT $ withContext $ \context -> do
+  result <- runExceptT . withModuleFromLLVMAssembly context fp $
+    \modToLink -> (join <$>) . runExceptT . withModuleFromAST context modlAST $
+      \modl -> runExceptT $ do
+        linkModules False modl modToLink
+        liftIO $ moduleAST modl
+  return $ either (Left . show) id result
 
-{-writeTargetCode :: FilePath -> AST.Module -> IO (Either String ())-}
 writeTargetCode :: FilePath -> AST.Module -> ExceptT String IO ()
 writeTargetCode fn astMod = ExceptT $
   withContext $ \context ->
