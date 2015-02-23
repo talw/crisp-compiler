@@ -14,6 +14,12 @@ unsigned isBoolean (unsigned val)
 unsigned isTag (unsigned val, unsigned tag, unsigned tagLen)
 {
   unsigned mask = pow(2.0, tagLen) - 1;
+  //printf("mask is: %d", mask);
+  //printf("\n");
+  //printf("tag is: %d", tag);
+  //printf("\n");
+  //printf("val is: %d", val);
+  //printf("\n");
 
   if ((val & mask) == tag)
     return TRUE_VALUE;
@@ -23,15 +29,10 @@ unsigned isTag (unsigned val, unsigned tag, unsigned tagLen)
 
 unsigned isChar (unsigned val)
 {
-  return isTag (val, CHAR_TAG, 8);
+  return isTag (val, CHAR_TAG, CHAR_TAG_LEN);
 }
 
 unsigned isNumber (unsigned val)
 {
-  return isTag (val, FIXNUM_TAG, 2);
+  return isTag (val, FIXNUM_TAG, FIXNUM_TAG_LEN);
 }
-
-/*int main(int argc, char *argv[])*/
-/*{*/
-  /*printf("%d\n", isChar(24847));*/
-/*}*/

@@ -46,7 +46,7 @@ jit modl = ExceptT . withContext $ \context ->
   withEE context $ \executionEngine ->
     runExceptT . withModuleFromAST context modl $ \m -> do
       EE.withModuleInEngine executionEngine m $ \ee -> do
-        mainfn <- EE.getFunction ee (AST.Name "main")
+        mainfn <- EE.getFunction ee (AST.Name "entryFunc")
         case mainfn of
           Just fn -> do
             res <- run fn

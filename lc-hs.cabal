@@ -17,6 +17,7 @@ cabal-version:       >=1.10
 
 data-files:          c-src/primitives.ll
                      c-src/driver.ll
+                     c-src/constants.ll
 
 executable lc-hs
   main-is:             Main.hs

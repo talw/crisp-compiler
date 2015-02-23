@@ -170,8 +170,11 @@ initModule label = withContext $ \context -> do
   dataDir <- getDataDir
   let primModFilePath = File $ dataDir </> "c-src/primitives.ll"
       driverModFilePath = File $ dataDir </> "c-src/driver.ll"
+      constsModFilePath = File $ dataDir </> "c-src/constants.ll"
   runExceptT $
-    linkModule primModFilePath >=> linkModule driverModFilePath
+    linkModule primModFilePath
+    >=> linkModule driverModFilePath
+    >=> linkModule constsModFilePath
     $ initialModAST
  where
   initialModAST = runLLVM
