@@ -20,6 +20,7 @@ import qualified LLVM.General.AST.Attribute as A
 import qualified LLVM.General.AST.CallingConvention as CC
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
 import qualified LLVM.General.AST.IntegerPredicate as IP
+import LLVM.General.AST.Type (ptr)
 
 -------------------------------------------------------------------------------
 -- Module Level
@@ -67,6 +68,9 @@ double = FloatingPointType 64 IEEE
 
 uintSize :: Num a => a
 uintSize = 32
+
+i8ptr :: Type
+i8ptr = ptr $ IntegerType 8
 
 uint :: Type
 uint = IntegerType uintSize
@@ -258,8 +262,18 @@ fdiv a b = instr $ FDiv NoFastMathFlags a b []
 fcmp :: FP.FloatingPointPredicate -> Operand -> Operand -> Codegen Operand
 fcmp cond a b = instr $ FCmp cond a b []
 
+funcOpr :: Type -> Name -> [Type] -> Operand
+funcOpr retTy name tys =
+  ConstantOperand
+    (C.GlobalReference
+      (FunctionType retTy tys False)
+       name)
+
 constUint :: Integral i => i -> Operand
 constUint = constOpr . C.Int uintSize . fromIntegral
+
+constUintSize :: Integral i => Word32 -> i -> Operand
+constUintSize size = constOpr . C.Int size . fromIntegral
 
 constOpr :: C.Constant -> Operand
 constOpr = ConstantOperand
@@ -285,6 +299,9 @@ toArgs = map (\x -> (x, []))
 -- Effects
 call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call False CC.C [] (Right fn) (toArgs args) [] []
+
+bitcast :: Operand -> Type -> Codegen Operand
+bitcast opr ty = instr $ BitCast opr ty []
 
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []

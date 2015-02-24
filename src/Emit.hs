@@ -72,12 +72,18 @@ codegenTop expr = define uint "entryFunc" [] blks
     cgen expr >>= ret
 
 codegenExterns :: LLVM ()
-codegenExterns {-(Extern name args)-} = external (ptr $ AST.IntegerType 8) "malloc" fnargs
- where fnargs = toSig ["size"]
+codegenExterns {-(Extern name args)-} = external i8ptr "malloc" fnargs
+ where fnargs = [(AST.IntegerType 64, AST.Name "size")]
 
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
+
+malloc :: Int -> AST.Type -> Codegen AST.Operand
+malloc size ty = do
+  res <- call (funcOpr i8ptr (AST.Name "malloc") [AST.IntegerType 64])
+              [constUintSize 64 size]
+  bitcast res $ ptr ty
 
 comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 comp ip a b = do
