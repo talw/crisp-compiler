@@ -4,7 +4,7 @@ import Data.Set (union)
 import qualified Data.Set as S
 import Data.Foldable (foldl')
 
-type Name = String
+type SymName = String
 
 data BinOp
   = Add
@@ -45,6 +45,7 @@ reservedWords =
   ,"and"
   ,"or"
   ,"not"
+  ,"__env"
   ]
 
 data Expr
@@ -53,17 +54,17 @@ data Expr
   | CharExp Char
   | BoolExp Bool
   | VarExp String
-  | GlbVarExp Name
-  | DefExp Name Expr
+  | GlbVarExp SymName
+  | DefExp SymName Expr
   | IfExp Expr Expr Expr
-  | FuncExp [Name] Expr
+  | FuncExp [SymName] Expr
   | CallExp Expr [Expr]
-  {-| Extern Name [Name]-}
+  {-| Extern SymName [SymName]-}
   | BinOpExp BinOp Expr Expr
   deriving (Eq, Ord, Show)
 
-findFreeVars :: Expr -> [Name]
-findFreeVars (FuncExp vars exp) = S.toList $ go vars exp
+findFreeVars :: [SymName] -> Expr -> [SymName]
+findFreeVars vars exp = S.toList $ go vars exp
  where
   go vars (VarExp var) = if var `elem` vars then S.empty else S.singleton var
   go vars (BinOpExp _ e1 e2) = go vars e1 `union` go vars e2
@@ -71,4 +72,3 @@ findFreeVars (FuncExp vars exp) = S.toList $ go vars exp
   go vars (CallExp e1 es) = go vars e1 `union` theRest
     where theRest = foldl' union S.empty $ map (go vars) es
   go _ _ = S.empty
-findFreeVars _ = error "findFreeVars - not called with a function expression"

@@ -20,9 +20,10 @@ import LLVM.General.Target (withDefaultTargetMachine)
 
 import Data.Traversable
 import Data.Functor ((<$>))
+import Data.List (sort)
 import Control.Monad.Trans.Except
 import Control.Monad
-import Control.Monad.State (modify, gets)
+import Control.Monad.State (modify, gets, get)
 import Control.Monad.IO.Class (liftIO)
 
 import Codegen
@@ -51,25 +52,49 @@ delPrevMain = do
   filt _ = True
 
 codegenTop :: Expr -> LLVM ()
-codegenTop (DefExp name (FuncExp args body)) =
-  define uint name fnargs bls
+--TODO reflect the changes in entryFunc's codegenTop to be in defexp as well
+--refactor into a single entity
+{-codegenTop (DefExp name (FuncExp args body)) =-}
+  {-define uint name fnargs bls-}
+ {-where-}
+  {-fnargs = toSig args-}
+  {-bls = createBlocks $ execCodegen $ do-}
+    {-blk <- addBlock entryBlockName-}
+    {-setBlock blk-}
+    {-for args $ \a -> do-}
+      {-var <- alloca uint-}
+      {-store var (local (AST.Name a))-}
+      {-assign a var-}
+    {-cgen body >>= ret-}
+
+
+codegenTop expr = do
+  define uint funcName [] funcBlks
+  sequence_ extraFuncsComputations
+ where
+  funcName = "entryFunc"
+  cgst = execCodegen funcName $ do
+    blk <- addBlock entryBlockName
+    setBlock blk
+    cgen expr >>= ret
+  funcBlks = createBlocks cgst
+  extraFuncsComputations = extraFuncs cgst
+
+--TODO should be used for codegenTop's DefExp as well
+codegenFunction :: SymName -> Codegen a -> Expr -> LLVM ()
+codegenFunction funcName cmds (FuncExp args body) =
+  define uint funcName fnargs bls
  where
   fnargs = toSig args
-  bls = createBlocks $ execCodegen $ do
+  bls = createBlocks $ execCodegen funcName $ do
     blk <- addBlock entryBlockName
     setBlock blk
     for args $ \a -> do
       var <- alloca uint
       store var (local (AST.Name a))
       assign a var
+    cmds
     cgen body >>= ret
-
-codegenTop expr = define uint "entryFunc" [] blks
- where
-  blks = createBlocks $ execCodegen $ do
-    blk <- addBlock entryBlockName
-    setBlock blk
-    cgen expr >>= ret
 
 codegenExterns :: LLVM ()
 codegenExterns {-(Extern name args)-} = external i8ptr "malloc" fnargs
@@ -131,6 +156,33 @@ cgen (CallExp (GlbVarExp name) args) = do
   operands <- traverse cgen args
   call (externf (AST.Name name)) operands
 
+cgen fe@(FuncExp vars body) = do
+  cgst <- get
+
+  let
+    (lambdaName, supply) =
+      uniqueName (funcName cgst ++ "-lambda") $ names cgst
+    createFuncComputation = codegenFunction lambdaName lambdaBodyPrelude $
+      FuncExp ("__env" : vars) body
+
+  modify $ \cgst -> cgst
+    { extraFuncs = createFuncComputation : extraFuncs cgst
+    , names = supply
+    }
+  return $ funcOpr uint (AST.Name lambdaName) $
+    replicate (length vars) uint --TODO this is after trampoline
+
+ where
+  freeVars = sort $ findFreeVars vars body
+  structType = lambdaStructType vars body
+  lambdaBodyPrelude = do
+    let envPtr = local $ AST.Name "__env"
+    for (zip [0..] freeVars) $ \(ix,freeVar) -> do
+      localVar <- alloca uint
+      elementPtr <- getelementptr envPtr ix
+      store localVar elementPtr
+      assign freeVar localVar
+
 cgen (IfExp cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -166,6 +218,11 @@ cgen _ = error "cgen called with unexpected Expr"
   --cval <- cgen val
   --store a cval
   --return cval
+
+lambdaStructType :: [SymName] -> Expr -> AST.Type
+lambdaStructType vars body =
+  AST.StructureType True $ replicate (length freeVars) uint
+ where freeVars = findFreeVars vars body
 
 -------------------------------------------------------------------------------
 -- Compilation

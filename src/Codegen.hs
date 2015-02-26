@@ -22,12 +22,14 @@ import qualified LLVM.General.AST.FloatingPointPredicate as FP
 import qualified LLVM.General.AST.IntegerPredicate as IP
 import LLVM.General.AST.Type (ptr)
 
+import Syntax (SymName)
+
 -------------------------------------------------------------------------------
 -- Module Level
 -------------------------------------------------------------------------------
 
 newtype LLVM a = LLVM { unLLVM :: State AST.Module a }
-  deriving (Functor, Applicative, Monad, MonadState AST.Module )
+  deriving (Functor, Applicative, Monad, MonadState AST.Module)
 
 runLLVM :: AST.Module -> LLVM a -> AST.Module
 runLLVM = flip (execState . unLLVM)
@@ -91,7 +93,7 @@ uniqueName nm ns =
 -- Codegen State
 -------------------------------------------------------------------------------
 
-type SymbolTable = [(String, Operand)]
+type SymbolTable = [(SymName, Operand)]
 
 data CodegenState
   = CodegenState {
@@ -101,7 +103,9 @@ data CodegenState
   , blockCount   :: Int                      -- Count of basic blocks
   , count        :: Word                     -- Count of unnamed instructions
   , names        :: Names                    -- Name Supply
-  } deriving Show
+  , extraFuncs   :: [LLVM ()]                -- LLVM computations of lambdas
+  , funcName     :: SymName                  -- 'CodegenState's function name
+  } {-deriving Show-}
 
 data BlockState
   = BlockState {
@@ -135,11 +139,12 @@ entryBlockName = "entry"
 emptyBlock :: Int -> BlockState
 emptyBlock i = BlockState i [] Nothing
 
-emptyCodegen :: CodegenState
-emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty
+emptyCodegen :: SymName -> CodegenState
+emptyCodegen fname =
+  CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty [] fname
 
-execCodegen :: Codegen a -> CodegenState
-execCodegen m = execState (runCodegen m) emptyCodegen
+execCodegen :: SymName -> Codegen a -> CodegenState
+execCodegen fname m = execState (runCodegen m) $ emptyCodegen fname
 
 fresh :: Codegen Word
 fresh = do
@@ -311,6 +316,10 @@ store ptr val = instr $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
 load ptr = instr $ Load False ptr Nothing 0 []
+
+getelementptr :: Integral i => Operand -> i -> Codegen Operand
+getelementptr address ix =
+  instr $ GetElementPtr True address [constUint ix] []
 
 -- Control Flow
 br :: Name -> Codegen (Named Terminator)
