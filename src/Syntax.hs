@@ -46,6 +46,7 @@ reservedWords =
   ,"or"
   ,"not"
   ,"__env"
+  ,"malloc"
   ]
 
 data Expr
