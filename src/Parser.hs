@@ -37,7 +37,7 @@ binOpP = LX.parens $ liftA3 BinOpExp
 
 callP :: Parser Expr
 callP = LX.parens $ CallExp
-  <$> (GlbVarExp <$> LX.identifier)
+  <$> (variableP <|> lambdaP)
   <*> many exprP
 
 variableP :: Parser Expr
