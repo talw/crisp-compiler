@@ -51,6 +51,9 @@ define retty label argtys body = addDefn $
   , basicBlocks = body
   }
 
+defineType :: String -> Type -> LLVM ()
+defineType name ty = addDefn . TypeDefinition (Name name) . Just $ ty
+
 external ::  Type -> String -> [(Type, Name)] -> LLVM ()
 external retty label argtys = addDefn $
   GlobalDefinition $ functionDefaults {
