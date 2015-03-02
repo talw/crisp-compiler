@@ -17,8 +17,9 @@ lexer = Tok.makeTokenParser style
   style = emptyDef
             { Tok.commentLine   = ";"
             , Tok.reservedNames = reservedWords
-                             ++ map fst str2bool
-                             ++ map fst str2binOp
+                                  ++ primFuncs
+                                  ++ map fst str2bool
+                                  ++ map fst str2binOp
             , Tok.identStart    = letter <|> oneOf "_#"
             }
 

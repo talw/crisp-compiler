@@ -9,6 +9,7 @@ import Data.Function
 import qualified Data.Map as Map
 
 import Control.Monad.State
+import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Applicative
 
 import LLVM.General.AST
@@ -42,8 +43,8 @@ addDefn d = do
   defs <- gets moduleDefinitions
   modify $ \s -> s { moduleDefinitions = defs ++ [d] }
 
-define ::  Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
-define retty label argtys body = addDefn $
+defineFunc :: Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
+defineFunc retty label argtys body = addDefn $
   GlobalDefinition $ functionDefaults {
     name        = Name label
   , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
@@ -73,6 +74,9 @@ double = FloatingPointType 64 IEEE
 
 uintSize :: Num a => a
 uintSize = 32
+
+uintSizeBytes :: Integral a => a
+uintSizeBytes  = uintSize `div` 8
 
 i8ptr :: Type
 i8ptr = ptr $ IntegerType 8
@@ -220,24 +224,24 @@ assign var x = do
   lcls <- gets symtab
   modify $ \s -> s { symtab = (var, x) : lcls }
 
-getvar :: String -> Codegen Operand
-getvar var = do
-  syms <- gets symtab
-  case lookup var syms of
-    Just x  -> return x
-    Nothing -> error $ "Local variable not in scope: " ++ show var
+getvar :: String -> Codegen (Maybe Operand)
+getvar var = return . lookup var =<< gets symtab
+{-getvar var = syms <- gets symtab-}
+  {-case lookup var syms of-}
+    {-Just x  -> return x-}
+    {-Nothing -> error $ "Local variable not in scope: " ++ show var-}
 
 -------------------------------------------------------------------------------
 
 -- References
-local ::  Name -> Operand
+local :: Name -> Operand
 local = LocalReference uint
 
 global ::  Name -> C.Constant
 global = C.GlobalReference uint
 
-externf :: Name -> Operand
-externf = ConstantOperand . C.GlobalReference uint
+extern :: Name -> Operand
+extern = ConstantOperand . C.GlobalReference uint
 
 -- Arithmetic and Constants
 iadd :: Operand -> Operand -> Codegen Operand
@@ -272,10 +276,13 @@ fcmp cond a b = instr $ FCmp cond a b []
 
 funcOpr :: Type -> Name -> [Type] -> Operand
 funcOpr retTy name tys =
-  ConstantOperand
-    (C.GlobalReference
+  constOpr $
+    C.GlobalReference
       (FunctionType retTy tys False)
-       name)
+      name
+
+namedType :: String -> Type
+namedType = AST.NamedTypeReference . AST.Name
 
 constUint :: Integral i => i -> Operand
 constUint = constOpr . C.Int uintSize . fromIntegral
@@ -322,7 +329,7 @@ load ptr = instr $ Load False ptr Nothing 0 []
 
 getelementptr :: Integral i => Operand -> i -> Codegen Operand
 getelementptr address ix =
-  instr $ GetElementPtr True address [constUint ix] []
+  instr $ GetElementPtr True address [constUint 0, constUint ix] []
 
 -- Control Flow
 br :: Name -> Codegen (Named Terminator)

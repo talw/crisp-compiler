@@ -60,6 +60,10 @@ notP = reservedFuncP "not" $ do
   expr <- exprP
   return $ IfExp expr (BoolExp False) (BoolExp True)
 
+primFuncP :: Parser Expr
+primFuncP = LX.parens $
+  PrimCallExp <$> oneOfReserved primFuncs <*> many exprP
+
 andP :: Parser Expr
 andP = reservedFuncP "and" go
  where
@@ -85,6 +89,7 @@ exprP = LX.lexeme . asum . map try $
   [ binOpP
   , callP
   , defineP
+  , primFuncP
   , ifP
   , notP
   , andP

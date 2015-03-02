@@ -21,10 +21,13 @@ import LLVM.General.Target (withDefaultTargetMachine)
 import Data.Traversable
 import Data.Functor ((<$>))
 import Data.List (sort)
+import Data.Maybe (fromJust, fromMaybe)
+import Control.Applicative ((<|>))
 import Control.Monad.Trans.Except
 import Control.Monad
 import Control.Monad.State (modify, gets, get)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Maybe (MaybeT(..))
 
 import Codegen
 import qualified Codegen as CG
@@ -35,6 +38,9 @@ import qualified Immediates as IM
 
 import Paths_lc_hs (getDataDir)
 import System.FilePath ((</>))
+
+argsTypeList :: Int -> [AST.Type]
+argsTypeList n = replicate n uint
 
 false :: AST.Operand
 false = constOpr . C.Int uintSize . fromIntegral $ IM.false
@@ -52,12 +58,12 @@ delPrevMain = do
   filt _ = True
 
 codegenTop :: Expr -> LLVM ()
---TODO reflect the changes in entryFunc's codegenTop to be in defexp as well
---refactor into a single entity
+codegenTop (DefExp name fe@(FuncExp args _)) =
+  codegenFunction name (argsTypeList $ length args) (return ()) fe
+
 {-codegenTop (DefExp name (FuncExp args body)) =-}
-  {-define uint name fnargs bls-}
+  {-defineFunc uint name fnargs bls-}
  {-where-}
-  {-fnargs = toSig args-}
   {-bls = createBlocks $ execCodegen $ do-}
     {-blk <- addBlock entryBlockName-}
     {-setBlock blk-}
@@ -69,7 +75,7 @@ codegenTop :: Expr -> LLVM ()
 
 
 codegenTop expr = do
-  define uint funcName [] funcBlks
+  defineFunc uint funcName [] funcBlks
   sequence_ extraFuncsComputations
  where
   funcName = "entryFunc"
@@ -80,13 +86,13 @@ codegenTop expr = do
   funcBlks = createBlocks cgst
   extraFuncsComputations = extraFuncs cgst
 
---TODO should be used for codegenTop's DefExp as well
-codegenFunction :: SymName -> Codegen a -> Expr -> LLVM ()
-codegenFunction funcName cmds (FuncExp args body) =
-  define uint funcName fnargs bls
+codegenFunction :: SymName -> [AST.Type] -> Codegen a -> Expr -> LLVM ()
+codegenFunction funcName argTys cmds (FuncExp args body) = do
+  defineFunc uint funcName fnargs blks
+  sequence_ extraFuncsComputations
  where
-  fnargs = toSig args
-  bls = createBlocks $ execCodegen funcName $ do
+  fnargs = zip argTys $ map AST.Name args
+  cgst = execCodegen funcName $ do
     blk <- addBlock entryBlockName
     setBlock blk
     for args $ \a -> do
@@ -95,6 +101,11 @@ codegenFunction funcName cmds (FuncExp args body) =
       assign a var
     cmds
     cgen body >>= ret
+  blks = createBlocks cgst
+  extraFuncsComputations = extraFuncs cgst
+
+codegenType :: SymName -> AST.Type -> LLVM ()
+codegenType = defineType
 
 codegenExterns :: LLVM ()
 codegenExterns {-(Extern name args)-} = external i8ptr "malloc" fnargs
@@ -138,7 +149,8 @@ asIRbinOp Eq   = comp IP.EQ
 
 cgen :: Expr -> Codegen AST.Operand
 
-cgen (VarExp x) = getvar x >>= load
+cgen (VarExp x) =
+  maybe (return . extern $ AST.Name x) load =<< getvar x
 
 cgen (BoolExp True) = return . constUint $ IM.true
 cgen (BoolExp False) = return . constUint $ IM.false
@@ -152,9 +164,20 @@ cgen (BinOpExp op a b) = do
   cb <- cgen b
   asIRbinOp op ca cb
 
-cgen (CallExp (GlbVarExp name) args) = do
+cgen (PrimCallExp primName args) = do
   operands <- traverse cgen args
-  call (externf (AST.Name name)) operands
+  call (extern $ AST.Name primName) operands
+
+cgen (CallExp func args) = do
+  funcEnvPtr <- cgen func
+  operands <- traverse cgen args
+  envPtrPtr <- getelementptr funcEnvPtr 0
+  envPtr <- load envPtrPtr
+  funcPtrPtr <- getelementptr funcEnvPtr 1
+  funcPtr <- load funcPtrPtr
+  call funcPtr $ envPtr : operands
+
+--((lambda(x)(+ x ((lambda(y)(+ y x)) 2))) 5)
 
 cgen fe@(FuncExp vars body) = do
   cgst <- get
@@ -162,26 +185,57 @@ cgen fe@(FuncExp vars body) = do
   let
     (lambdaName, supply) =
       uniqueName (funcName cgst ++ "-lambda") $ names cgst
-    createFuncComputation = codegenFunction lambdaName lambdaBodyPrelude $
-      FuncExp ("__env" : vars) body
+    envTypeName = lambdaName ++ "-struct"
+    lambdaArgTys = ptr (namedType envTypeName)
+      : argsTypeList (length vars)
+    est = envStructType freeVars
+    ft = AST.FunctionType uint lambdaArgTys False
+    st = structType [ptr (namedType envTypeName), ptr ft]
 
+    createFuncComputation =
+      codegenFunction lambdaName lambdaArgTys lambdaBodyPrelude $
+      FuncExp ("__env" : vars) body
+    createTypeComputation = defineType envTypeName est
+
+    lambdaBodyPrelude = do
+      let envPtr =
+            AST.LocalReference (ptr $ namedType envTypeName)
+            $ AST.Name "__env"
+      for (zip [0..] freeVars) $ \(ix,freeVar) -> do
+        localVar <- alloca uint
+        elementPtr <- getelementptr envPtr ix
+        element <- load elementPtr
+        store localVar element
+        assign freeVar localVar
+
+  --Instantiating env struct and filling it
+  envPtr <- malloc (uintSizeBytes * length freeVars)
+         $ namedType envTypeName
+  for (zip [0..] freeVars) $ \(ix,freeVar) -> do
+    fvPtr <- flip liftM (getvar freeVar)
+               $ fromMaybe
+                   (error "bug - freevar filling")
+    fvVal <- load fvPtr
+    setElemPtr envPtr ix fvVal
+
+  --Adding llvm computations to add the lambda function and env struct
+  --as globals in the llvm module
   modify $ \cgst -> cgst
-    { extraFuncs = createFuncComputation : extraFuncs cgst
+    { extraFuncs = createFuncComputation
+                 : createTypeComputation
+                 : extraFuncs cgst
     , names = supply
     }
-  return $ funcOpr uint (AST.Name lambdaName) $
-    replicate (length vars) uint --TODO this is after trampoline
 
+  returnedOpr <- alloca st
+  setElemPtr returnedOpr 0 envPtr
+  setElemPtr returnedOpr 1 $
+    funcOpr uint (AST.Name lambdaName) lambdaArgTys
+  return returnedOpr
  where
   freeVars = sort $ findFreeVars vars body
-  structType = lambdaStructType vars body
-  lambdaBodyPrelude = do
-    let envPtr = local $ AST.Name "__env"
-    for (zip [0..] freeVars) $ \(ix,freeVar) -> do
-      localVar <- alloca uint
-      elementPtr <- getelementptr envPtr ix
-      store localVar elementPtr
-      assign freeVar localVar
+  setElemPtr struct ix item =
+    getelementptr struct ix >>= flip store item
 
 cgen (IfExp cond tr fl) = do
   ifthen <- addBlock "if.then"
@@ -219,10 +273,16 @@ cgen _ = error "cgen called with unexpected Expr"
   --store a cval
   --return cval
 
-lambdaStructType :: [SymName] -> Expr -> AST.Type
-lambdaStructType vars body =
-  AST.StructureType True $ replicate (length freeVars) uint
- where freeVars = findFreeVars vars body
+-------------------------------------------------------------------------------
+-- Composite Types
+-------------------------------------------------------------------------------
+
+structType :: [AST.Type] -> AST.Type
+structType tys = AST.StructureType True tys
+
+envStructType :: [SymName] -> AST.Type
+envStructType freeVars =
+  AST.StructureType True . argsTypeList $ length freeVars
 
 -------------------------------------------------------------------------------
 -- Compilation

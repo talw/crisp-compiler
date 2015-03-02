@@ -49,17 +49,26 @@ reservedWords =
   ,"malloc"
   ]
 
+primFuncs :: [String]
+primFuncs =
+  ["isBoolean"
+  ,"isTag"
+  ,"isChar"
+  ,"isNumber"
+  ]
+
 data Expr
   = NumberExp Integer
   | EmptyExp
   | CharExp Char
   | BoolExp Bool
-  | VarExp String
-  | GlbVarExp SymName
+  | VarExp SymName
+  {-| GlbVarExp SymName-}
   | DefExp SymName Expr
   | IfExp Expr Expr Expr
   | FuncExp [SymName] Expr
   | CallExp Expr [Expr]
+  | PrimCallExp SymName [Expr]
   {-| Extern SymName [SymName]-}
   | BinOpExp BinOp Expr Expr
   deriving (Eq, Ord, Show)
