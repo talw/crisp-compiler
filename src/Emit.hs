@@ -48,6 +48,10 @@ false = constOpr . C.Int uintSize . fromIntegral $ IM.false
 toSig :: [String] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (uint, AST.Name x))
 
+setElemPtr :: AST.Operand -> Int -> AST.Operand -> Codegen AST.Operand
+setElemPtr struct ix item =
+  getelementptr struct ix >>= flip store item
+
 delPrevMain :: LLVM ()
 delPrevMain = do
   md <- gets AST.moduleDefinitions
@@ -58,21 +62,15 @@ delPrevMain = do
   filt _ = True
 
 codegenTop :: Expr -> LLVM ()
-codegenTop (DefExp name fe@(FuncExp args _)) =
-  codegenFunction name (argsTypeList $ length args) (return ()) fe
-
-{-codegenTop (DefExp name (FuncExp args body)) =-}
-  {-defineFunc uint name fnargs bls-}
- {-where-}
-  {-bls = createBlocks $ execCodegen $ do-}
-    {-blk <- addBlock entryBlockName-}
-    {-setBlock blk-}
-    {-for args $ \a -> do-}
-      {-var <- alloca uint-}
-      {-store var (local (AST.Name a))-}
-      {-assign a var-}
-    {-cgen body >>= ret-}
-
+codegenTop (DefExp name (FuncExp args body)) = do
+  codegenFunction name argTys (return ()) (FuncExp ("__env" : args) body)
+  defineType (name ++ "-pairStruct") $
+    structType
+      [ ptr emptyStructType
+      , ptr $ AST.FunctionType uint argTys False
+      ]
+ where
+  argTys = ptr emptyStructType : argsTypeList (length args)
 
 codegenTop expr = do
   defineFunc uint funcName [] funcBlks
@@ -149,8 +147,14 @@ asIRbinOp Eq   = comp IP.EQ
 
 cgen :: Expr -> Codegen AST.Operand
 
-cgen (VarExp x) =
-  maybe (return . extern $ AST.Name x) load =<< getvar x
+cgen (VarExp varName) =
+  maybe funcWithEmptyEnv load =<< getvar varName
+ where
+  funcWithEmptyEnv = do
+    returnedOpr <- alloca $ namedType $ varName ++ "-pairStruct"
+    setElemPtr returnedOpr 1 $
+      extern $ AST.Name varName
+    return returnedOpr
 
 cgen (BoolExp True) = return . constUint $ IM.true
 cgen (BoolExp False) = return . constUint $ IM.false
@@ -234,8 +238,6 @@ cgen fe@(FuncExp vars body) = do
   return returnedOpr
  where
   freeVars = sort $ findFreeVars vars body
-  setElemPtr struct ix item =
-    getelementptr struct ix >>= flip store item
 
 cgen (IfExp cond tr fl) = do
   ifthen <- addBlock "if.then"
@@ -276,6 +278,9 @@ cgen _ = error "cgen called with unexpected Expr"
 -------------------------------------------------------------------------------
 -- Composite Types
 -------------------------------------------------------------------------------
+
+emptyStructType :: AST.Type
+emptyStructType = AST.StructureType True []
 
 structType :: [AST.Type] -> AST.Type
 structType tys = AST.StructureType True tys
