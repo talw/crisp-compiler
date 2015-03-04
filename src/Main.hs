@@ -44,13 +44,12 @@ process modl source = do
 main :: IO ()
 main = do
   args <- getArgs
-  emod <- initModule "default module"
-  case emod of
-    Left err -> putStrLn err
-    Right initMod ->
-      case args of
-        []      -> repl initMod
-        fname : _ -> compile fname initMod
+  case args of
+    []      -> emodAction False repl
+    fname : _ -> emodAction True $ compile fname
+ where
+  emodAction isCompiled action =
+    either putStrLn action =<< initModule isCompiled "default module"
 
 compile :: FilePath -> AST.Module -> IO ()
 compile fname astMod = do

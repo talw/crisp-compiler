@@ -38,6 +38,7 @@ import qualified Immediates as IM
 
 import Paths_lc_hs (getDataDir)
 import System.FilePath ((</>))
+import Debug.Trace (trace)
 
 argsTypeList :: Int -> [AST.Type]
 argsTypeList n = replicate n uint
@@ -64,7 +65,7 @@ delPrevMain = do
 codegenTop :: Expr -> LLVM ()
 codegenTop (DefExp name (FuncExp args body)) = do
   codegenFunction name argTys (return ()) (FuncExp (envVarName : args) body)
-  defineType (name ++ "-pairStruct") $
+  trace "defineType" $ defineType (name ++ suffPairStruct) $
     structType
       [ ptr emptyStructType
       , ptr $ AST.FunctionType uint argTys False
@@ -293,16 +294,16 @@ envStructType freeVars =
 -- Compilation
 -------------------------------------------------------------------------------
 
-initModule :: String -> IO (Either String AST.Module)
-initModule label = withContext $ \context -> do
+initModule :: Bool -> String -> IO (Either String AST.Module)
+initModule linkDriver label = withContext $ \context -> do
   dataDir <- getDataDir
   let primModFilePath = File $ dataDir </> "c-src/primitives.ll"
       driverModFilePath = File $ dataDir </> "c-src/driver.ll"
       constsModFilePath = File $ dataDir </> "c-src/constants.ll"
   runExceptT $
     linkModule primModFilePath
-    >=> linkModule driverModFilePath
     >=> linkModule constsModFilePath
+    >=> (if linkDriver then linkModule driverModFilePath else return)
     $ initialModAST
  where
   initialModAST = runLLVM
@@ -314,7 +315,7 @@ linkModule fp modlAST = ExceptT $ withContext $ \context -> do
   result <- runExceptT . withModuleFromLLVMAssembly context fp $
     \modToLink -> (join <$>) . runExceptT . withModuleFromAST context modlAST $
       \modl -> runExceptT $ do
-        linkModules False modl modToLink
+        linkModules True modl modToLink
         liftIO $ moduleAST modl
   return $ either (Left . show) id result
 
@@ -340,5 +341,5 @@ codegen modl exprs = do
     Right newAst -> return newAst
     Left err     -> putStrLn err >> return preOptiAst
  where
-  deltaModl  = delPrevMain >> traverse codegenTop exprs
+  deltaModl  = delPrevMain >> trace "im running" traverse codegenTop exprs
   preOptiAst = runLLVM modl deltaModl
