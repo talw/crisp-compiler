@@ -63,7 +63,7 @@ delPrevMain = do
 
 codegenTop :: Expr -> LLVM ()
 codegenTop (DefExp name (FuncExp args body)) = do
-  codegenFunction name argTys (return ()) (FuncExp ("__env" : args) body)
+  codegenFunction name argTys (return ()) (FuncExp (envVarName : args) body)
   defineType (name ++ "-pairStruct") $
     structType
       [ ptr emptyStructType
@@ -151,7 +151,7 @@ cgen (VarExp varName) =
   maybe funcWithEmptyEnv load =<< getvar varName
  where
   funcWithEmptyEnv = do
-    returnedOpr <- alloca $ namedType $ varName ++ "-pairStruct"
+    returnedOpr <- alloca $ namedType $ varName ++ suffPairStruct
     setElemPtr returnedOpr 1 $
       extern $ AST.Name varName
     return returnedOpr
@@ -188,8 +188,8 @@ cgen fe@(FuncExp vars body) = do
 
   let
     (lambdaName, supply) =
-      uniqueName (funcName cgst ++ "-lambda") $ names cgst
-    envTypeName = lambdaName ++ "-struct"
+      uniqueName (funcName cgst ++ suffLambda) $ names cgst
+    envTypeName = lambdaName ++ suffEnvStruct
     lambdaArgTys = ptr (namedType envTypeName)
       : argsTypeList (length vars)
     est = envStructType freeVars
@@ -198,13 +198,13 @@ cgen fe@(FuncExp vars body) = do
 
     createFuncComputation =
       codegenFunction lambdaName lambdaArgTys lambdaBodyPrelude $
-      FuncExp ("__env" : vars) body
+      FuncExp (envVarName : vars) body
     createTypeComputation = defineType envTypeName est
 
     lambdaBodyPrelude = do
       let envPtr =
             AST.LocalReference (ptr $ namedType envTypeName)
-            $ AST.Name "__env"
+            $ AST.Name envVarName
       for (zip [0..] freeVars) $ \(ix,freeVar) -> do
         localVar <- alloca uint
         elementPtr <- getelementptr envPtr ix

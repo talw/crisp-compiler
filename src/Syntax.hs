@@ -57,6 +57,12 @@ primFuncs =
   ,"isNumber"
   ]
 
+envVarName, suffPairStruct, suffLambda, suffEnvStruct :: String
+suffPairStruct = "-pairStruct"
+suffLambda = "-lambda"
+suffEnvStruct = "-envStruct"
+envVarName = "__env"
+
 data Expr
   = NumberExp Integer
   | EmptyExp
