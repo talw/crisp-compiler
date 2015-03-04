@@ -12,6 +12,7 @@ import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
 import qualified LLVM.General.AST.IntegerPredicate as IP
 import LLVM.General.AST.Type (ptr)
+import LLVM.General.AST (Instruction(GetElementPtr))
 import LLVM.General (moduleLLVMAssembly, withModuleFromAST)
 import LLVM.General.Context (withContext)
 import LLVM.General.Module
@@ -63,15 +64,16 @@ delPrevMain = do
   filt _ = True
 
 codegenTop :: Expr -> LLVM ()
-codegenTop (DefExp name (FuncExp args body)) = do
+codegenTop (DefExp name (FuncExp args body)) =
   codegenFunction name argTys (return ()) (FuncExp (envVarName : args) body)
-  trace "defineType" $ defineType (name ++ suffPairStruct) $
-    structType
-      [ ptr emptyStructType
-      , ptr $ AST.FunctionType uint argTys False
-      ]
+  {-defineType (name ++ suffPairStruct) $-}
+    {-structType-}
+      {-[ ptr emptyStructType-}
+      {-, ptr $ AST.FunctionType uint argTys False-}
+      {-]-}
  where
-  argTys = ptr emptyStructType : argsTypeList (length args)
+  argTys = argsTypeList $ length args + 1
+  {-argTys = ptr emptyStructType : argsTypeList (length args)-}
 
 codegenTop expr = do
   defineFunc uint funcName [] funcBlks
@@ -107,18 +109,19 @@ codegenType :: SymName -> AST.Type -> LLVM ()
 codegenType = defineType
 
 codegenExterns :: LLVM ()
-codegenExterns {-(Extern name args)-} = external i8ptr "malloc" fnargs
+codegenExterns {-(Extern name args)-} = external uint "malloc" fnargs
  where fnargs = [(AST.IntegerType 64, AST.Name "size")]
 
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
 
-malloc :: Int -> AST.Type -> Codegen AST.Operand
-malloc size ty = do
-  res <- call (funcOpr i8ptr (AST.Name "malloc") [AST.IntegerType 64])
+malloc :: Int -> Codegen AST.Operand
+malloc size =
+  {-res <- call (funcOpr i8ptr (AST.Name "malloc") [AST.IntegerType 64])-}
+  call (funcOpr uint (AST.Name "malloc") [AST.IntegerType 64])
               [constUintSize 64 size]
-  bitcast res $ ptr ty
+  {-bitcast res uint-}
 
 comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 comp ip a b = do
@@ -149,13 +152,21 @@ asIRbinOp Eq   = comp IP.EQ
 cgen :: Expr -> Codegen AST.Operand
 
 cgen (VarExp varName) =
+  {-maybe funcWithEmptyEnv load =<< getvar varName-}
   maybe funcWithEmptyEnv load =<< getvar varName
  where
   funcWithEmptyEnv = do
-    returnedOpr <- alloca $ namedType $ varName ++ suffPairStruct
-    setElemPtr returnedOpr 1 $
-      extern $ AST.Name varName
-    return returnedOpr
+    pair <- malloc (3 * uintSizeBytes)--TODO again is it necessary?
+    pairC <- inttoptr pair $ ptr $ structType [uint, uint]
+
+    funcOprC <- ptrtoint (extern $ AST.Name varName) uint
+    setElemPtr pairC 1 funcOprC
+    ptrtoint pairC uint --TODO is it necessary?
+    {-return pairC-}
+    {-returnedOpr <- alloca $ namedType $ varName ++ suffPairStruct-}
+    {-setElemPtr returnedOpr 1 $-}
+      {-extern $ AST.Name varName-}
+    {-return returnedOpr-}
 
 cgen (BoolExp True) = return . constUint $ IM.true
 cgen (BoolExp False) = return . constUint $ IM.false
@@ -175,12 +186,19 @@ cgen (PrimCallExp primName args) = do
 
 cgen (CallExp func args) = do
   funcEnvPtr <- cgen func
-  operands <- traverse cgen args
-  envPtrPtr <- getelementptr funcEnvPtr 0
+  funcEnvPtrC <- inttoptr funcEnvPtr $ ptr $ structType [uint, uint]
+  envPtrPtr <- getelementptr funcEnvPtrC 0
   envPtr <- load envPtrPtr
-  funcPtrPtr <- getelementptr funcEnvPtr 1
+  funcPtrPtr <- getelementptr funcEnvPtrC 1
   funcPtr <- load funcPtrPtr
-  call funcPtr $ envPtr : operands
+  funcPtrC <- inttoptr funcPtr $
+     ptr $ AST.FunctionType uint (argsTypeList $ length args + 1) False
+  {-funcPtrPtrC <- inttoptr funcPtrPtr $-}
+     {-ptr $ AST.FunctionType uint (argsTypeList $ length args + 1) False-}
+  {-funcPtr <- load funcPtrPtrC-}
+
+  operands <- traverse cgen args
+  call funcPtrC $ envPtr : operands
 
 --((lambda(x)(+ x ((lambda(y)(+ y x)) 2))) 5)
 
@@ -191,38 +209,28 @@ cgen fe@(FuncExp vars body) = do
     (lambdaName, supply) =
       uniqueName (funcName cgst ++ suffLambda) $ names cgst
     envTypeName = lambdaName ++ suffEnvStruct
-    lambdaArgTys = ptr (namedType envTypeName)
-      : argsTypeList (length vars)
+    {-lambdaArgTys = ptr (namedType envTypeName)-}
+      {-: argsTypeList (length vars)-}
     est = envStructType freeVars
-    ft = AST.FunctionType uint lambdaArgTys False
-    st = structType [ptr (namedType envTypeName), ptr ft]
+    atl = argsTypeList $ length vars + 1
+    {-ft = AST.FunctionType uint (argsTypeList $ length vars + 1) False-}
+    {-st = structType [uint, uint]-}
 
-    createFuncComputation =
-      codegenFunction lambdaName lambdaArgTys lambdaBodyPrelude $
-      FuncExp (envVarName : vars) body
     createTypeComputation = defineType envTypeName est
-
+    createFuncComputation =
+      codegenFunction lambdaName atl lambdaBodyPrelude $
+      FuncExp (envVarName : vars) body
     lambdaBodyPrelude = do
       let envPtr =
-            AST.LocalReference (ptr $ namedType envTypeName)
+            AST.LocalReference uint
             $ AST.Name envVarName
+      envPtrC <- inttoptr envPtr $ ptr $ namedType envTypeName
       for (zip [0..] freeVars) $ \(ix,freeVar) -> do
         localVar <- alloca uint
-        elementPtr <- getelementptr envPtr ix
+        elementPtr <- getelementptr envPtrC ix
         element <- load elementPtr
         store localVar element
         assign freeVar localVar
-
-  --Instantiating env struct and filling it
-  envPtr <- malloc (uintSizeBytes * length freeVars)
-         $ namedType envTypeName
-  for (zip [0..] freeVars) $ \(ix,freeVar) -> do
-    fvPtr <- flip liftM (getvar freeVar)
-               $ fromMaybe
-                   (error "bug - freevar filling")
-    fvVal <- load fvPtr
-    setElemPtr envPtr ix fvVal
-
   --Adding llvm computations to add the lambda function and env struct
   --as globals in the llvm module
   modify $ \cgst -> cgst
@@ -232,11 +240,32 @@ cgen fe@(FuncExp vars body) = do
     , names = supply
     }
 
-  returnedOpr <- alloca st
-  setElemPtr returnedOpr 0 envPtr
-  setElemPtr returnedOpr 1 $
-    funcOpr uint (AST.Name lambdaName) lambdaArgTys
-  return returnedOpr
+
+  --Setting up the operand to return
+  returnedOpr <- malloc (10 * uintSizeBytes) -- TODO is 8 bytes (64 bits) enough for a struct of 2 int64s?
+  returnedOprC <- inttoptr returnedOpr $ ptr $ structType [uint, uint]
+
+  --Instantiating env struct and filling it
+  envPtr <- malloc (uintSizeBytes * (length freeVars + 1)) -- TODO is it necessary?
+  envPtrC <- inttoptr envPtr $ ptr $ namedType envTypeName
+  for (zip [0..] freeVars) $ \(ix,freeVar) -> do
+    fvPtr <- flip liftM (getvar freeVar)
+               $ fromMaybe
+                   (error "bug - freevar filling")
+    fvVal <- load fvPtr
+    setElemPtr envPtrC ix fvVal
+
+  envPtrCC <- ptrtoint envPtrC uint
+  setElemPtr returnedOprC 0 envPtrCC -- TODO is it necessary?
+
+  funcOprC <- ptrtoint (funcOpr uint (AST.Name lambdaName) atl) uint
+  setElemPtr returnedOprC 1 funcOprC
+
+  -- TODO didn't solve but might be
+  --a problem as well<]
+  {-setElemPtr returnedOprC 1 $ funcOpr uint (AST.Name lambdaName) atl-}
+
+  ptrtoint returnedOprC uint -- TODO is it really neccessary? can I return returnedOpr instead?
  where
   freeVars = sort $ findFreeVars vars body
 

@@ -6,7 +6,7 @@
 
 unsigned entryFunc();
 
-void showImmediate(unsigned val)
+void showImmediate(unsigned long val)
 {
   //printf("got value: %d\n", val);
   //printf("got value: %#08x\n", val);
@@ -20,7 +20,7 @@ void showImmediate(unsigned val)
   else if (isChar(val) == TRUE_VALUE)
     printf("#\\%c", val >> CHAR_TAG_LEN);
   else if (isNumber(val) == TRUE_VALUE)
-    printf("%d", val >> FIXNUM_TAG_LEN);
+    printf("%lu", val >> FIXNUM_TAG_LEN);
   else
     printf("Unrecognized value");
 
@@ -29,6 +29,6 @@ void showImmediate(unsigned val)
 
 int main(int argc, char *argv[])
 {
-  unsigned retVal = entryFunc();
+  unsigned long retVal = entryFunc();
   showImmediate(retVal);
 }

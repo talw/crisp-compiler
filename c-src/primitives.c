@@ -3,7 +3,7 @@
 
 #include "constants.h"
 
-unsigned isBoolean (unsigned val)
+unsigned long isBoolean (unsigned long val)
 {
   if (val == FALSE_VALUE || val == TRUE_VALUE)
     return TRUE_VALUE;
@@ -11,7 +11,7 @@ unsigned isBoolean (unsigned val)
     return FALSE_VALUE;
 }
 
-unsigned isTag (unsigned val, unsigned tag, unsigned tagLen)
+unsigned long isTag (unsigned long val, unsigned tag, unsigned tagLen)
 {
   unsigned mask = pow(2.0, tagLen) - 1;
   //printf("mask is: %d", mask);
@@ -27,12 +27,12 @@ unsigned isTag (unsigned val, unsigned tag, unsigned tagLen)
     return FALSE_VALUE;
 }
 
-unsigned isChar (unsigned val)
+unsigned long isChar (unsigned long val)
 {
   return isTag (val, CHAR_TAG, CHAR_TAG_LEN);
 }
 
-unsigned isNumber (unsigned val)
+unsigned long isNumber (unsigned long val)
 {
   return isTag (val, FIXNUM_TAG, FIXNUM_TAG_LEN);
 }

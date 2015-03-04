@@ -68,21 +68,20 @@ external retty label argtys = addDefn $
 -- Types
 -------------------------------------------------------------------------------
 
--- IEEE 754 double
-double :: Type
-double = FloatingPointType 64 IEEE
+uint :: Type
+uint = IntegerType uintSize
 
 uintSize :: Num a => a
-uintSize = 32
+uintSize = 64
 
-uintSizeBytes :: Integral a => a
-uintSizeBytes  = uintSize `div` 8
+double :: Type
+double = FloatingPointType 64 IEEE
 
 i8ptr :: Type
 i8ptr = ptr $ IntegerType 8
 
-uint :: Type
-uint = IntegerType uintSize
+uintSizeBytes :: Integral a => a
+uintSizeBytes  = uintSize `div` 8
 
 -------------------------------------------------------------------------------
 -- Names
@@ -296,6 +295,12 @@ constOpr = ConstantOperand
 uitofp :: Type -> Operand -> Codegen Operand
 uitofp ty a = instr $ UIToFP a ty []
 
+inttoptr :: Operand -> Type -> Codegen Operand
+inttoptr  a ty = instr $ IntToPtr a ty []
+
+ptrtoint :: Operand -> Type -> Codegen Operand
+ptrtoint  a ty = instr $ PtrToInt a ty []
+
 zext :: Type -> Operand -> Codegen Operand
 zext ty a = instr $ ZExt a ty []
 
@@ -329,7 +334,7 @@ load ptr = instr $ Load False ptr Nothing 0 []
 
 getelementptr :: Integral i => Operand -> i -> Codegen Operand
 getelementptr address ix =
-  instr $ GetElementPtr True address [constUint 0, constUint ix] []
+  instr $ GetElementPtr True address [constUintSize 32 0, constUintSize 32 ix] []
 
 -- Control Flow
 br :: Name -> Codegen (Named Terminator)
