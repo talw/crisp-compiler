@@ -45,8 +45,9 @@ reservedWords =
   ,"and"
   ,"or"
   ,"not"
-  ,"__env"
+  ,envVarName
   ,"malloc"
+  ,"let"
   ]
 
 primFuncs :: [String]

@@ -79,6 +79,15 @@ orP = reservedFuncP "or" go
     let notExp = IfExp expr (BoolExp False) (BoolExp True)
     liftA3 IfExp (pure notExp) go (pure expr) <|> return expr
 
+letP :: Parser Expr
+letP = reservedFuncP "let" $ do
+  nameExprPairs <- LX.parens $
+    many $ LX.parens $ (,) <$> LX.identifier <*> exprP
+  body <- exprP
+  return $ CallExp
+    (FuncExp (map fst nameExprPairs) body)
+    $ map snd nameExprPairs
+
 reservedFuncP :: String -> Parser a -> Parser a
 reservedFuncP name parser = LX.parens $ do
   LX.reserved name
@@ -94,6 +103,7 @@ exprP = LX.lexeme . asum . map try $
   , notP
   , andP
   , orP
+  , letP
   , lambdaP
   , numberP
   , boolP
