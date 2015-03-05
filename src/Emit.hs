@@ -103,8 +103,10 @@ codegenType :: SymName -> AST.Type -> LLVM ()
 codegenType = defineType
 
 codegenExterns :: LLVM ()
-codegenExterns = external uint "malloc" fnargs
- where fnargs = [(AST.IntegerType 64, AST.Name "size")]
+codegenExterns = do
+  external uint "malloc"   [(AST.IntegerType 64, AST.Name "size")]
+  external uint "memalign" [(AST.IntegerType 64, AST.Name "alignment")
+                           ,(AST.IntegerType 64, AST.Name "size") ]
 
 -------------------------------------------------------------------------------
 -- Operations
@@ -114,6 +116,11 @@ malloc :: Int -> Codegen AST.Operand
 malloc size =
   call (funcOpr uint (AST.Name "malloc") [AST.IntegerType 64])
               [constUintSize 64 size]
+
+memalign :: Int -> Codegen AST.Operand
+memalign size =
+  call (funcOpr uint (AST.Name "memalign") $ replicate 2 $ AST.IntegerType 64)
+    $ map (constUintSize 64) [1, size]
 
 comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 comp ip a b = do
@@ -161,6 +168,9 @@ cgen (BoolExp False) = return . constUint $ IM.false
 cgen (NumberExp n) = return . constUint . toFixnum $ n
 
 cgen (CharExp c) = return . constUint . toChar $ c
+  {-do-}
+  {-memalign 10-}
+  {-memalign 20-}
 
 cgen (BinOpExp op a b) = do
   ca <- cgen a

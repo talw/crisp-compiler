@@ -47,6 +47,7 @@ reservedWords =
   ,"not"
   ,envVarName
   ,"malloc"
+  ,"memalign"
   ,"let"
   ]
 
