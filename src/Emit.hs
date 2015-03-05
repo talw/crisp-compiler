@@ -192,11 +192,11 @@ cgen fe@(FuncExp vars body) = do
   let
     (lambdaName, supply) =
       uniqueName (funcName cgst ++ suffLambda) $ names cgst
-    envTypeName = lambdaName ++ suffEnvStruct
+    {-envTypeName = lambdaName ++ suffEnvStruct-}
     est = envStructType freeVars
     atl = argsTypeList $ length vars + 1
 
-    createTypeComputation = defineType envTypeName est
+    {-createTypeComputation = defineType envTypeName est-}
     createFuncComputation =
       codegenFunction lambdaName atl lambdaBodyPrelude $
       FuncExp (envVarName : vars) body
@@ -204,7 +204,7 @@ cgen fe@(FuncExp vars body) = do
       let envPtr =
             AST.LocalReference uint
             $ AST.Name envVarName
-      envPtrC <- inttoptr envPtr $ ptr $ namedType envTypeName
+      envPtrC <- inttoptr envPtr $ ptr $ est
       for (zip [0..] freeVars) $ \(ix,freeVar) -> do
         localVar <- alloca uint
         elementPtr <- getelementptr envPtrC ix
@@ -215,7 +215,7 @@ cgen fe@(FuncExp vars body) = do
   --as globals in the llvm module
   modify $ \cgst -> cgst
     { extraFuncs = createFuncComputation
-                 : createTypeComputation
+                 {-: createTypeComputation-}
                  : extraFuncs cgst
     , names = supply
     }
@@ -227,7 +227,7 @@ cgen fe@(FuncExp vars body) = do
 
   --Instantiating an env struct and filling it
   envPtr <- malloc (uintSizeBytes * length freeVars)
-  envPtrC <- inttoptr envPtr $ ptr $ namedType envTypeName
+  envPtrC <- inttoptr envPtr $ ptr $ est
   for (zip [0..] freeVars) $ \(ix,freeVar) -> do
     fvPtr <- flip liftM (getvar freeVar)
                $ fromMaybe
