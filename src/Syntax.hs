@@ -50,12 +50,12 @@ reservedWords =
   ,"let"
   ]
 
-primFuncs :: [String]
+primFuncs :: [(String, String)]
 primFuncs =
-  ["isBoolean"
-  ,"isTag"
-  ,"isChar"
-  ,"isNumber"
+  [("boolean?", "isBoolean")
+  ,("char?", "isChar")
+  ,("number?", "isNumber")
+  ,("isTag", "isTag")
   ]
 
 envVarName, suffPairStruct, suffLambda, suffEnvStruct :: String

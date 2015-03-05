@@ -11,7 +11,7 @@ unsigned long isBoolean (unsigned long val)
     return FALSE_VALUE;
 }
 
-unsigned long isTag (unsigned long val, unsigned tag, unsigned tagLen)
+static unsigned long isTag (unsigned long val, unsigned tag, unsigned tagLen)
 {
   unsigned mask = pow(2.0, tagLen) - 1;
   //printf("mask is: %d", mask);

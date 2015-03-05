@@ -62,7 +62,7 @@ notP = reservedFuncP "not" $ do
 
 primFuncP :: Parser Expr
 primFuncP = LX.parens $
-  PrimCallExp <$> oneOfReserved primFuncs <*> many exprP
+  PrimCallExp <$> mapP primFuncs <*> many exprP
 
 andP :: Parser Expr
 andP = reservedFuncP "and" go

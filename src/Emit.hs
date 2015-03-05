@@ -192,11 +192,9 @@ cgen fe@(FuncExp vars body) = do
   let
     (lambdaName, supply) =
       uniqueName (funcName cgst ++ suffLambda) $ names cgst
-    {-envTypeName = lambdaName ++ suffEnvStruct-}
     est = envStructType freeVars
     atl = argsTypeList $ length vars + 1
 
-    {-createTypeComputation = defineType envTypeName est-}
     createFuncComputation =
       codegenFunction lambdaName atl lambdaBodyPrelude $
       FuncExp (envVarName : vars) body
@@ -204,7 +202,7 @@ cgen fe@(FuncExp vars body) = do
       let envPtr =
             AST.LocalReference uint
             $ AST.Name envVarName
-      envPtrC <- inttoptr envPtr $ ptr $ est
+      envPtrC <- inttoptr envPtr $ ptr est
       for (zip [0..] freeVars) $ \(ix,freeVar) -> do
         localVar <- alloca uint
         elementPtr <- getelementptr envPtrC ix
@@ -227,7 +225,7 @@ cgen fe@(FuncExp vars body) = do
 
   --Instantiating an env struct and filling it
   envPtr <- malloc (uintSizeBytes * length freeVars)
-  envPtrC <- inttoptr envPtr $ ptr $ est
+  envPtrC <- inttoptr envPtr $ ptr est
   for (zip [0..] freeVars) $ \(ix,freeVar) -> do
     fvPtr <- flip liftM (getvar freeVar)
                $ fromMaybe
@@ -319,7 +317,7 @@ linkModule fp modlAST = ExceptT $ withContext $ \context -> do
   result <- runExceptT . withModuleFromLLVMAssembly context fp $
     \modToLink -> (join <$>) . runExceptT . withModuleFromAST context modlAST $
       \modl -> runExceptT $ do
-        linkModules True modl modToLink
+        linkModules False modl modToLink
         liftIO $ moduleAST modl
   return $ either (Left . show) id result
 
