@@ -66,14 +66,8 @@ delPrevMain = do
 codegenTop :: Expr -> LLVM ()
 codegenTop (DefExp name (FuncExp args body)) =
   codegenFunction name argTys (return ()) (FuncExp (envVarName : args) body)
-  {-defineType (name ++ suffPairStruct) $-}
-    {-structType-}
-      {-[ ptr emptyStructType-}
-      {-, ptr $ AST.FunctionType uint argTys False-}
-      {-]-}
  where
   argTys = argsTypeList $ length args + 1
-  {-argTys = ptr emptyStructType : argsTypeList (length args)-}
 
 codegenTop expr = do
   defineFunc uint funcName [] funcBlks
@@ -109,7 +103,7 @@ codegenType :: SymName -> AST.Type -> LLVM ()
 codegenType = defineType
 
 codegenExterns :: LLVM ()
-codegenExterns {-(Extern name args)-} = external uint "malloc" fnargs
+codegenExterns = external uint "malloc" fnargs
  where fnargs = [(AST.IntegerType 64, AST.Name "size")]
 
 -------------------------------------------------------------------------------
@@ -118,10 +112,8 @@ codegenExterns {-(Extern name args)-} = external uint "malloc" fnargs
 
 malloc :: Int -> Codegen AST.Operand
 malloc size =
-  {-res <- call (funcOpr i8ptr (AST.Name "malloc") [AST.IntegerType 64])-}
   call (funcOpr uint (AST.Name "malloc") [AST.IntegerType 64])
               [constUintSize 64 size]
-  {-bitcast res uint-}
 
 comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 comp ip a b = do
@@ -156,17 +148,12 @@ cgen (VarExp varName) =
   maybe funcWithEmptyEnv load =<< getvar varName
  where
   funcWithEmptyEnv = do
-    pair <- malloc (3 * uintSizeBytes)--TODO again is it necessary?
+    pair <- malloc (2 * uintSizeBytes)
     pairC <- inttoptr pair $ ptr $ structType [uint, uint]
 
     funcOprC <- ptrtoint (extern $ AST.Name varName) uint
     setElemPtr pairC 1 funcOprC
-    ptrtoint pairC uint --TODO is it necessary?
-    {-return pairC-}
-    {-returnedOpr <- alloca $ namedType $ varName ++ suffPairStruct-}
-    {-setElemPtr returnedOpr 1 $-}
-      {-extern $ AST.Name varName-}
-    {-return returnedOpr-}
+    return pair
 
 cgen (BoolExp True) = return . constUint $ IM.true
 cgen (BoolExp False) = return . constUint $ IM.false
@@ -193,9 +180,6 @@ cgen (CallExp func args) = do
   funcPtr <- load funcPtrPtr
   funcPtrC <- inttoptr funcPtr $
      ptr $ AST.FunctionType uint (argsTypeList $ length args + 1) False
-  {-funcPtrPtrC <- inttoptr funcPtrPtr $-}
-     {-ptr $ AST.FunctionType uint (argsTypeList $ length args + 1) False-}
-  {-funcPtr <- load funcPtrPtrC-}
 
   operands <- traverse cgen args
   call funcPtrC $ envPtr : operands
@@ -209,12 +193,8 @@ cgen fe@(FuncExp vars body) = do
     (lambdaName, supply) =
       uniqueName (funcName cgst ++ suffLambda) $ names cgst
     envTypeName = lambdaName ++ suffEnvStruct
-    {-lambdaArgTys = ptr (namedType envTypeName)-}
-      {-: argsTypeList (length vars)-}
     est = envStructType freeVars
     atl = argsTypeList $ length vars + 1
-    {-ft = AST.FunctionType uint (argsTypeList $ length vars + 1) False-}
-    {-st = structType [uint, uint]-}
 
     createTypeComputation = defineType envTypeName est
     createFuncComputation =
@@ -242,11 +222,11 @@ cgen fe@(FuncExp vars body) = do
 
 
   --Setting up the operand to return
-  returnedOpr <- malloc (10 * uintSizeBytes) -- TODO is 8 bytes (64 bits) enough for a struct of 2 int64s?
+  returnedOpr <- malloc (2 * uintSizeBytes)
   returnedOprC <- inttoptr returnedOpr $ ptr $ structType [uint, uint]
 
-  --Instantiating env struct and filling it
-  envPtr <- malloc (uintSizeBytes * (length freeVars + 1)) -- TODO is it necessary?
+  --Instantiating an env struct and filling it
+  envPtr <- malloc (uintSizeBytes * length freeVars)
   envPtrC <- inttoptr envPtr $ ptr $ namedType envTypeName
   for (zip [0..] freeVars) $ \(ix,freeVar) -> do
     fvPtr <- flip liftM (getvar freeVar)
@@ -255,17 +235,12 @@ cgen fe@(FuncExp vars body) = do
     fvVal <- load fvPtr
     setElemPtr envPtrC ix fvVal
 
-  envPtrCC <- ptrtoint envPtrC uint
-  setElemPtr returnedOprC 0 envPtrCC -- TODO is it necessary?
+  setElemPtr returnedOprC 0 envPtr
 
   funcOprC <- ptrtoint (funcOpr uint (AST.Name lambdaName) atl) uint
   setElemPtr returnedOprC 1 funcOprC
 
-  -- TODO didn't solve but might be
-  --a problem as well<]
-  {-setElemPtr returnedOprC 1 $ funcOpr uint (AST.Name lambdaName) atl-}
-
-  ptrtoint returnedOprC uint -- TODO is it really neccessary? can I return returnedOpr instead?
+  return returnedOpr
  where
   freeVars = sort $ findFreeVars vars body
 
