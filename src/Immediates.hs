@@ -12,12 +12,6 @@ import Data.Char (chr, ord)
 
 import Utils
 
-data ImmediateType
-  = Fixnum
-  | Char
-  | Nil
-  | Bool
-
 maskOfFormat :: String -> Word32
 maskOfFormat = readBinary . tr "0*" "10"
 
@@ -33,6 +27,9 @@ charFormat   = "00001111"
 nilFormat    = "00111111"
 boolFormat   = "0*101111"
 pairFormat   =      "001"
+
+nilValue :: Word32
+nilValue = readBinary nilFormat
 
 toFixnum :: Integer -> Integer
 toFixnum = flip shift $ shiftWidthOfFormat fixnumFormat

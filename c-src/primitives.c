@@ -11,6 +11,14 @@ unsigned long isBoolean (unsigned long val)
     return FALSE_VALUE;
 }
 
+unsigned long isNull (unsigned long val)
+{
+  if (val == NIL_VALUE)
+    return TRUE_VALUE;
+  else
+    return FALSE_VALUE;
+}
+
 static unsigned long isTag (unsigned long val, unsigned tag, unsigned tagLen)
 {
   unsigned mask = pow(2.0, tagLen) - 1;

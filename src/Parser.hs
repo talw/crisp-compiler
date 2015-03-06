@@ -31,7 +31,9 @@ pairP = reservedFuncP "cons" $
   PairExp <$> exprP <*> exprP
 
 emptyP :: Parser Expr
-emptyP = EmptyExp <$ LX.parens eof
+emptyP = do
+  LX.reserved dataPrefix
+  LX.parens (return EmptyExp)
 
 binOpP :: Parser Expr
 binOpP = LX.parens $ liftA3 BinOpExp
@@ -114,6 +116,7 @@ exprP = LX.lexeme . asum . map try $
   , boolP
   , charP
   , variableP
+  , emptyP
   ]
 
 contentsP :: Parser a -> Parser a

@@ -164,13 +164,9 @@ cgen (VarExp varName) =
 
 cgen (BoolExp True) = return . constUint $ IM.true
 cgen (BoolExp False) = return . constUint $ IM.false
-
 cgen (NumberExp n) = return . constUint . toFixnum $ n
-
 cgen (CharExp c) = return . constUint . toChar $ c
-  {-do-}
-  {-memalign 10-}
-  {-memalign 20-}
+cgen EmptyExp = return . constUint $ nilValue
 
 cgen (PairExp e1 e2) = do
   consPtr <- memalign 2

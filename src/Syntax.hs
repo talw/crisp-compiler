@@ -50,6 +50,7 @@ reservedWords =
   ,"memalign"
   ,"let"
   ,"cons"
+  ,dataPrefix
   ]
 
 primFuncs :: [(String, String)]
@@ -57,8 +58,12 @@ primFuncs =
   [("boolean?", "isBoolean")
   ,("char?", "isChar")
   ,("number?", "isNumber")
+  ,("null?", "isNull")
   ,("isTag", "isTag")
   ]
+
+dataPrefix :: String
+dataPrefix = "'"
 
 envVarName, suffPairStruct, suffLambda, suffEnvStruct :: String
 suffPairStruct = "-pairStruct"
