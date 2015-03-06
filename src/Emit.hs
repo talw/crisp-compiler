@@ -65,21 +65,13 @@ delPrevMain = do
 
 codegenTop :: Expr -> LLVM ()
 codegenTop (DefExp name (FuncExp args body)) =
-  codegenFunction name argTys (return ()) (FuncExp (envVarName : args) body)
+  codegenFunction name argTys
+    (return ()) (FuncExp (envVarName : args) body)
  where
   argTys = argsTypeList $ length args + 1
 
-codegenTop expr = do
-  defineFunc uint funcName [] funcBlks
-  sequence_ extraFuncsComputations
- where
-  funcName = "entryFunc"
-  cgst = execCodegen funcName $ do
-    blk <- addBlock entryBlockName
-    setBlock blk
-    cgen expr >>= ret
-  funcBlks = createBlocks cgst
-  extraFuncsComputations = extraFuncs cgst
+codegenTop expr =
+  codegenFunction "entryFunc" [] (return ()) (FuncExp [] expr)
 
 codegenFunction :: SymName -> [AST.Type] -> Codegen a -> Expr -> LLVM ()
 codegenFunction funcName argTys cmds (FuncExp args body) = do
@@ -342,12 +334,17 @@ printAsm modl = ExceptT $ withContext $ \context ->
 
 codegen :: AST.Module -> [Expr] -> IO AST.Module
 codegen modl exprs = do
-  let process = printAsm >=> optimize >=> jit
-
   res <- runExceptT $ process preOptiAst
   case res of
     Right newAst -> return newAst
     Left err     -> putStrLn err >> return preOptiAst
  where
-  deltaModl  = delPrevMain >> trace "im running" traverse codegenTop exprs
+  deltaModl  = delPrevMain >> traverse codegenTop exprs
   preOptiAst = runLLVM modl deltaModl
+  process = printAsm >=> optimize >=> jit
+
+  {-genEntryFunc = do-}
+  {-exprsToRunCount = length $ filter filt exprs-}
+   {-where-}
+    {-filt (DefExp {}) = False-}
+    {-filt _ = True-}

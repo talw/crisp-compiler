@@ -150,7 +150,8 @@ emptyCodegen fname =
   CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty [] fname
 
 execCodegen :: SymName -> Codegen a -> CodegenState
-execCodegen fname m = execState (runCodegen m) $ emptyCodegen fname
+execCodegen fname computation =
+  execState (runCodegen computation) $ emptyCodegen fname
 
 fresh :: Codegen Word
 fresh = do
