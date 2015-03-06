@@ -60,6 +60,8 @@ primFuncs =
   ,("char?", "isChar")
   ,("number?", "isNumber")
   ,("null?", "isNull")
+  ,("car", "car")
+  ,("cdr", "cdr")
   ]
 
 dataPrefix :: String

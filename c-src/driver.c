@@ -9,25 +9,25 @@ void showImmediate(unsigned long val);
 
 void showCons(unsigned long val)
 {
-  unsigned long *ptr = val - 1;
-  unsigned long car = *ptr;
-  unsigned long cdr = *(ptr + 1);
+  /*unsigned long *ptr = val - 1;*/
+  /*unsigned long head = *ptr;*/
+  /*unsigned long tail = *(ptr + 1);*/
 
-  showImmediate(car);
+  showImmediate(car(val));
 
-  if (isPair(cdr) == TRUE_VALUE)
+  if (isPair(cdr(val)) == TRUE_VALUE)
   {
     printf(" ");
-    showCons(cdr);
+    showCons(cdr(val));
   }
-  else if (cdr == NIL_VALUE)
+  else if (cdr(val) == NIL_VALUE)
   {
     return;
   }
   else
   {
     printf(" . ");
-    showImmediate(cdr);
+    showImmediate(cdr(val));
   }
 }
 

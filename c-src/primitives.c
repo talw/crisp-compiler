@@ -49,3 +49,15 @@ unsigned long isPair (unsigned long val)
 {
   return isTag (val, PAIR_TAG, PAIR_TAG_LEN);
 }
+
+unsigned long car (unsigned long val)
+{
+  unsigned long *ptr = val - 1;
+  return *ptr;
+}
+
+unsigned long cdr (unsigned long val)
+{
+  unsigned long *ptr = val - 1;
+  return *(ptr+1);
+}
