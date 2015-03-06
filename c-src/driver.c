@@ -5,6 +5,31 @@
 #include "primitives.h"
 
 unsigned entryFunc();
+void showImmediate(unsigned long val);
+
+void showCons(unsigned long val)
+{
+  unsigned long *ptr = val - 1;
+  unsigned long car = *ptr;
+  unsigned long cdr = *(ptr + 1);
+
+  showImmediate(car);
+
+  if (isPair(cdr) == TRUE_VALUE)
+  {
+    printf(" ");
+    showCons(cdr);
+  }
+  else if (cdr == NIL_VALUE)
+  {
+    return;
+  }
+  else
+  {
+    printf(" . ");
+    showImmediate(cdr);
+  }
+}
 
 void showImmediate(unsigned long val)
 {
@@ -23,11 +48,8 @@ void showImmediate(unsigned long val)
     printf("%lu", val >> FIXNUM_TAG_LEN);
   else if (isPair(val) == TRUE_VALUE)
   {
-    unsigned long *ptr = val - 1;
     printf("(");
-    showImmediate(*ptr);
-    printf(" ");
-    showImmediate(*(ptr+1));
+    showCons(val);
     printf(")");
   }
   else
