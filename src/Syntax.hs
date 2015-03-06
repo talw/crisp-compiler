@@ -62,6 +62,10 @@ primFuncs =
   ,("null?", "isNull")
   ,("car", "car")
   ,("cdr", "cdr")
+  ,("make-vector", "makeVector")
+  ,("vector?", "isVector")
+  ,("vecor-length", "vectorLength")
+  ,("vectorRef", "vector-ref")
   ]
 
 dataPrefix :: String

@@ -11,6 +11,8 @@ import Data.Bool (bool)
 import Data.Char (chr, ord)
 
 import Utils
+import Text.Printf (printf)
+import Control.Arrow ((>>>))
 
 maskOfFormat :: String -> Word32
 maskOfFormat = readBinary . tr "0*" "10"
@@ -21,12 +23,14 @@ formatMasked  = readBinary . tr "*" "0"
 shiftWidthOfFormat :: String -> Int
 shiftWidthOfFormat = length . takeWhile (/= '*') . reverse
 
-fixnumFormat, charFormat, nilFormat, boolFormat, pairFormat :: String
+fixnumFormat, charFormat, nilFormat  :: String
+boolFormat, pairFormat, vectorFormat :: String
 fixnumFormat =       "00"
 charFormat   = "00001111"
 nilFormat    = "00111111"
 boolFormat   = "0*101111"
 pairFormat   =      "001"
+vectorFormat   =      "101"
 
 nilValue :: Word32
 nilValue = readBinary nilFormat
@@ -50,10 +54,14 @@ showImmediate n =
     , (fixnumFormat, show)
     , (charFormat, \i -> "#\\" ++ [chr $ fromIntegral i])
     , (nilFormat, const "()")
-    , (pairFormat, ("to display pairs, please compile normally. " ++) . show . (* 8) )
+    , (pairFormat, mustCompileHandler "pair")
+    , (vectorFormat, mustCompileHandler "vector")
     ]
 
  where
+  mustCompileHandler typeName = (* 8) >>>
+    printf "To display %ss, please compile normally. %d" typeName
+
   handleValueOfType :: [(String, Word32 -> String)] -> String
   handleValueOfType = foldr combineHandlers ""
    where

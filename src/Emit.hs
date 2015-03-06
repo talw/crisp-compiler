@@ -176,7 +176,6 @@ cgen (PairExp e1 e2) = do
   store consPtrC opr1
   flip store opr2 =<< getelementptrRaw consPtrC [1]
   iadd consPtr $ constUintSize 64 1
-  {-return consPtr-}
 
 cgen (BinOpExp op a b) = do
   ca <- cgen a

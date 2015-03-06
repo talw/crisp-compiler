@@ -8,3 +8,5 @@ const int CHAR_TAG = 0x0F;
 const int CHAR_TAG_LEN = 8;
 const int PAIR_TAG = 0x01;
 const int PAIR_TAG_LEN = 3;
+const int VECTOR_TAG = 0x05;
+const int VECTOR_TAG_LEN = 3;

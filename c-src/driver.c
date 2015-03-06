@@ -31,6 +31,22 @@ void showCons(unsigned long val)
   }
 }
 
+void showVector(unsigned long val)
+{
+  unsigned long length = vectorLength(val);
+
+  printf("#(");
+
+  for (unsigned i=0; i < length; i++)
+  {
+    showImmediate(vectorRef(val, i));
+    if (i < length - 1)
+      printf(" ");
+  }
+
+  printf(")");
+}
+
 void showImmediate(unsigned long val)
 {
   //printf("got value: %d\n", val);
@@ -52,6 +68,8 @@ void showImmediate(unsigned long val)
     showCons(val);
     printf(")");
   }
+  else if (isVector(val) == TRUE_VALUE)
+    showVector(val); //TODO is it safe?
   else
     printf("Unrecognized value");
 

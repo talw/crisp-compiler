@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <malloc.h>
 #include <math.h>
 
 #include "constants.h"
@@ -52,12 +53,43 @@ unsigned long isPair (unsigned long val)
 
 unsigned long car (unsigned long val)
 {
-  unsigned long *ptr = val - 1;
+  unsigned long *ptr = val - PAIR_TAG;
   return *ptr;
 }
 
 unsigned long cdr (unsigned long val)
 {
-  unsigned long *ptr = val - 1;
+  unsigned long *ptr = val - PAIR_TAG;
   return *(ptr+1);
+}
+
+unsigned long isVector (unsigned long val)
+{
+  return isTag (val, VECTOR_TAG, VECTOR_TAG_LEN);
+}
+
+unsigned long vectorLength (unsigned long val)
+{
+  unsigned long *ptr = val - VECTOR_TAG;
+  return *ptr;
+}
+
+unsigned long vectorRef (unsigned long val, unsigned index)
+{
+  unsigned long *ptr = val - VECTOR_TAG;
+  return *(ptr + index + 1);
+}
+
+unsigned long makeVector (unsigned long size, unsigned long elem)
+{
+  size = size >> FIXNUM_TAG_LEN;
+  unsigned long *ptr =
+    memalign(1, (size + 1) * sizeof(unsigned long));
+
+  *(ptr) = size;
+
+  for (int i=1; i<=size; i++)
+    *(ptr + i) = elem;
+
+  return ((unsigned long) ptr) + VECTOR_TAG;
 }
