@@ -51,6 +51,17 @@ unsigned long isPair (unsigned long val)
   return isTag (val, PAIR_TAG, PAIR_TAG_LEN);
 }
 
+unsigned long cons (unsigned long elem1, unsigned long elem2)
+{
+  unsigned long *ptr =
+    memalign(1, 2 * sizeof(unsigned long));
+
+  *(ptr) = elem1;
+  *(ptr+1) = elem2;
+
+  return ((unsigned long) ptr) + PAIR_TAG;
+}
+
 unsigned long car (unsigned long val)
 {
   unsigned long *ptr = val - PAIR_TAG;

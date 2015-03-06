@@ -168,15 +168,6 @@ cgen (NumberExp n) = return . constUint . toFixnum $ n
 cgen (CharExp c) = return . constUint . toChar $ c
 cgen EmptyExp = return . constUint $ nilValue
 
-cgen (PairExp e1 e2) = do
-  consPtr <- memalign 2
-  consPtrC <- inttoptr consPtr $ ptr uint
-  opr1 <- cgen e1
-  opr2 <- cgen e2
-  store consPtrC opr1
-  flip store opr2 =<< getelementptrRaw consPtrC [1]
-  iadd consPtr $ constUintSize 64 1
-
 cgen (BinOpExp op a b) = do
   ca <- cgen a
   cb <- cgen b

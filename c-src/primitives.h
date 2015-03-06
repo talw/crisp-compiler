@@ -8,6 +8,7 @@ unsigned long isNumber (unsigned long val);
 unsigned long isNull (unsigned long val);
 unsigned long isVector (unsigned long val);
 
+unsigned long cons (unsigned long elem1, unsigned long elem2);
 unsigned long isPair (unsigned long val);
 unsigned long car (unsigned long val);
 unsigned long cdr (unsigned long val);

@@ -26,10 +26,6 @@ charP = CharExp <$> (string "#\\" *> anyChar)
 boolP :: Parser Expr
 boolP = BoolExp <$> mapP str2bool
 
-pairP :: Parser Expr
-pairP = reservedFuncP "cons" $
-  PairExp <$> exprP <*> exprP
-
 emptyP :: Parser Expr
 emptyP = do
   LX.reserved dataPrefix
@@ -112,7 +108,6 @@ exprP = LX.lexeme . asum . map try $
   , letP
   , lambdaP
   , numberP
-  , pairP
   , boolP
   , charP
   , variableP

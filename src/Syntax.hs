@@ -49,7 +49,6 @@ reservedWords =
   ,"malloc"
   ,"memalign"
   ,"let"
-  ,"cons"
   ,"isTag"
   ,dataPrefix
   ]
@@ -59,6 +58,7 @@ primFuncs =
   [("boolean?", "isBoolean")
   ,("char?", "isChar")
   ,("number?", "isNumber")
+  ,("cons", "cons")
   ,("null?", "isNull")
   ,("car", "car")
   ,("cdr", "cdr")
@@ -82,7 +82,6 @@ data Expr
   | EmptyExp
   | CharExp Char
   | BoolExp Bool
-  | PairExp Expr Expr
   | VarExp SymName
   | DefExp SymName Expr
   | IfExp Expr Expr Expr
