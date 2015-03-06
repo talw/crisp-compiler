@@ -36,3 +36,8 @@ unsigned long isNumber (unsigned long val)
 {
   return isTag (val, FIXNUM_TAG, FIXNUM_TAG_LEN);
 }
+
+unsigned long isPair (unsigned long val)
+{
+  return isTag (val, PAIR_TAG, PAIR_TAG_LEN);
+}

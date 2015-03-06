@@ -49,6 +49,7 @@ reservedWords =
   ,"malloc"
   ,"memalign"
   ,"let"
+  ,"cons"
   ]
 
 primFuncs :: [(String, String)]
@@ -70,14 +71,13 @@ data Expr
   | EmptyExp
   | CharExp Char
   | BoolExp Bool
+  | PairExp Expr Expr
   | VarExp SymName
-  {-| GlbVarExp SymName-}
   | DefExp SymName Expr
   | IfExp Expr Expr Expr
   | FuncExp [SymName] Expr
   | CallExp Expr [Expr]
   | PrimCallExp SymName [Expr]
-  {-| Extern SymName [SymName]-}
   | BinOpExp BinOp Expr Expr
   deriving (Eq, Ord, Show)
 

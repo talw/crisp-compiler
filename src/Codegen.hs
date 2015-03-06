@@ -333,8 +333,12 @@ load :: Operand -> Codegen Operand
 load ptr = instr $ Load False ptr Nothing 0 []
 
 getelementptr :: Integral i => Operand -> i -> Codegen Operand
-getelementptr address ix =
-  instr $ GetElementPtr True address [constUintSize 32 0, constUintSize 32 ix] []
+getelementptr address ix = getelementptrRaw address [0, ix]
+  {-instr $ GetElementPtr True address [constUintSize 32 0, constUintSize 32 ix] []-}
+
+getelementptrRaw :: Integral i => Operand -> [i] -> Codegen Operand
+getelementptrRaw address ixs =
+  instr $ GetElementPtr True address (map (constUintSize 32) ixs) []
 
 -- Control Flow
 br :: Name -> Codegen (Named Terminator)

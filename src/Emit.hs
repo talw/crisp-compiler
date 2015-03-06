@@ -115,12 +115,12 @@ codegenExterns = do
 malloc :: Int -> Codegen AST.Operand
 malloc size =
   call (funcOpr uint (AST.Name "malloc") [AST.IntegerType 64])
-              [constUintSize 64 size]
+              [constUintSize 64 $ uintSizeBytes * size]
 
 memalign :: Int -> Codegen AST.Operand
 memalign size =
   call (funcOpr uint (AST.Name "memalign") $ replicate 2 $ AST.IntegerType 64)
-    $ map (constUintSize 64) [1, size]
+    $ map (constUintSize 64) [1, uintSizeBytes * size]
 
 comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 comp ip a b = do
@@ -155,7 +155,7 @@ cgen (VarExp varName) =
   maybe funcWithEmptyEnv load =<< getvar varName
  where
   funcWithEmptyEnv = do
-    pair <- malloc (2 * uintSizeBytes)
+    pair <- malloc 2
     pairC <- inttoptr pair $ ptr $ structType [uint, uint]
 
     funcOprC <- ptrtoint (extern $ AST.Name varName) uint
@@ -171,6 +171,16 @@ cgen (CharExp c) = return . constUint . toChar $ c
   {-do-}
   {-memalign 10-}
   {-memalign 20-}
+
+cgen (PairExp e1 e2) = do
+  consPtr <- memalign 2
+  consPtrC <- inttoptr consPtr $ ptr uint
+  opr1 <- cgen e1
+  opr2 <- cgen e2
+  store consPtrC opr1
+  flip store opr2 =<< getelementptrRaw consPtrC [1]
+  iadd consPtr $ constUintSize 64 1
+  {-return consPtr-}
 
 cgen (BinOpExp op a b) = do
   ca <- cgen a
@@ -230,11 +240,11 @@ cgen fe@(FuncExp vars body) = do
 
 
   --Setting up the operand to return
-  returnedOpr <- malloc (2 * uintSizeBytes)
+  returnedOpr <- malloc 2
   returnedOprC <- inttoptr returnedOpr $ ptr $ structType [uint, uint]
 
   --Instantiating an env struct and filling it
-  envPtr <- malloc (uintSizeBytes * length freeVars)
+  envPtr <- malloc $ length freeVars
   envPtrC <- inttoptr envPtr $ ptr est
   for (zip [0..] freeVars) $ \(ix,freeVar) -> do
     fvPtr <- flip liftM (getvar freeVar)

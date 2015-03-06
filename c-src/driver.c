@@ -21,14 +21,23 @@ void showImmediate(unsigned long val)
     printf("#\\%c", val >> CHAR_TAG_LEN);
   else if (isNumber(val) == TRUE_VALUE)
     printf("%lu", val >> FIXNUM_TAG_LEN);
+  else if (isPair(val) == TRUE_VALUE)
+  {
+    unsigned long *ptr = val - 1;
+    printf("(");
+    showImmediate(*ptr);
+    printf(" ");
+    showImmediate(*(ptr+1));
+    printf(")");
+  }
   else
     printf("Unrecognized value");
 
-  printf("\n");
 }
 
 int main(int argc, char *argv[])
 {
   unsigned long retVal = entryFunc();
   showImmediate(retVal);
+  printf("\n");
 }
