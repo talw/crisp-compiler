@@ -50,6 +50,7 @@ reservedWords =
   ,"memalign"
   ,"let"
   ,"cons"
+  ,"isTag"
   ,dataPrefix
   ]
 
@@ -59,7 +60,6 @@ primFuncs =
   ,("char?", "isChar")
   ,("number?", "isNumber")
   ,("null?", "isNull")
-  ,("isTag", "isTag")
   ]
 
 dataPrefix :: String
