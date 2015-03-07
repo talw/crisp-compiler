@@ -90,6 +90,10 @@ letP = reservedFuncP "let" $ do
     (FuncExp (map fst nameExprPairs) body)
     $ map snd nameExprPairs
 
+setP :: Parser Expr
+setP = reservedFuncP "set!" $
+  SetExp <$> LX.identifier <*> exprP
+
 reservedFuncP :: String -> Parser a -> Parser a
 reservedFuncP name parser = LX.parens $ do
   LX.reserved name
@@ -106,6 +110,7 @@ exprP = LX.lexeme . asum . map try $
   , andP
   , orP
   , letP
+  , setP
   , lambdaP
   , numberP
   , boolP

@@ -6,6 +6,7 @@ module Codegen where
 import Data.Word
 import Data.List
 import Data.Function
+import Data.Map (Map)
 import qualified Data.Map as Map
 
 import Control.Monad.State
@@ -99,7 +100,7 @@ uniqueName nm ns =
 -- Codegen State
 -------------------------------------------------------------------------------
 
-type SymbolTable = [(SymName, Operand)]
+type SymbolTable = Map SymName Operand
 
 data CodegenState
   = CodegenState {
@@ -147,7 +148,7 @@ emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: SymName -> CodegenState
 emptyCodegen fname =
-  CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty [] fname
+  CodegenState (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty [] fname
 
 execCodegen :: SymName -> Codegen a -> CodegenState
 execCodegen fname computation =
@@ -222,14 +223,10 @@ current = do
 assign :: String -> Operand -> Codegen ()
 assign var x = do
   lcls <- gets symtab
-  modify $ \s -> s { symtab = (var, x) : lcls }
+  modify $ \s -> s { symtab = Map.insert var x lcls }
 
 getvar :: String -> Codegen (Maybe Operand)
-getvar var = return . lookup var =<< gets symtab
-{-getvar var = syms <- gets symtab-}
-  {-case lookup var syms of-}
-    {-Just x  -> return x-}
-    {-Nothing -> error $ "Local variable not in scope: " ++ show var-}
+getvar var = return . Map.lookup var =<< gets symtab
 
 -------------------------------------------------------------------------------
 

@@ -49,6 +49,7 @@ reservedWords =
   ,"malloc"
   ,"memalign"
   ,"let"
+  ,"set!"
   ,"isTag"
   ,dataPrefix
   ]
@@ -87,6 +88,7 @@ data Expr
   | CharExp Char
   | BoolExp Bool
   | VarExp SymName
+  | SetExp SymName Expr
   | DefExp SymName Expr
   | IfExp Expr Expr Expr
   | FuncExp [SymName] [Expr]
@@ -102,6 +104,9 @@ findFreeVars vars exprs = S.toList
                         $ exprs
  where
   go vars (VarExp var) = if var `elem` vars then S.empty else S.singleton var
+  go vars (SetExp var e) = if var `elem` vars
+                                then S.empty
+                                else S.singleton var `union` go vars e
   go vars (BinOpExp _ e1 e2) = go vars e1 `union` go vars e2
   go vars (IfExp e1 e2 e3) = go vars e1 `union` go vars e2 `union` go vars e3
   go vars (CallExp e1 es) = go vars e1 `union` theRest

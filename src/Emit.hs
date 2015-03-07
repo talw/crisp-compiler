@@ -40,6 +40,7 @@ import qualified Immediates as IM
 import Paths_lc_hs (getDataDir)
 import System.FilePath ((</>))
 import Debug.Trace (trace)
+import Text.Printf (printf)
 
 argsTypeList :: Int -> [AST.Type]
 argsTypeList n = replicate n uint
@@ -86,7 +87,7 @@ codegenTop exprs = do
 
 codegenFunction :: SymName -> [AST.Type] -> Codegen a
                 -> [SymName] -> [Expr] -> LLVM ()
-codegenFunction funcName argTys cmds args exprs = do
+codegenFunction funcName argTys prologue args exprs = do
   defineFunc uint funcName fnargs blks
   sequence_ extraFuncsComputations
  where
@@ -98,13 +99,16 @@ codegenFunction funcName argTys cmds args exprs = do
       var <- alloca uint
       store var (local (AST.Name a))
       assign a var
-    cmds
-    cgenComputation
+
+    prologue
+    res <- cgenComputation
+    ret res
+
   cgenComputation = do
     resList <- traverse cgen exprs
-    ret $ if null resList
-            then constUint nilValue
-            else last resList
+    return $ if null resList
+               then constUint nilValue
+               else last resList
   blks = createBlocks cgst
   extraFuncsComputations = extraFuncs cgst
 
@@ -171,6 +175,13 @@ cgen (VarExp varName) =
     setElemPtr pairC 1 funcOprC
     return pair
 
+cgen (SetExp varName expr) = do
+  ptr <- maybe (error errMsg) return =<< getvar varName
+  store ptr =<< cgen expr
+  return $ constUint nilValue
+ where
+  errMsg = printf "variable: %s, was not found" varName
+
 cgen (BoolExp True) = return . constUint $ IM.true
 cgen (BoolExp False) = return . constUint $ IM.false
 cgen (NumberExp n) = return . constUint . toFixnum $ n
@@ -210,18 +221,19 @@ cgen fe@(FuncExp vars body) = do
 
     createFuncComputation =
       codegenFunction
-        lambdaName atl lambdaBodyPrelude (envVarName : vars) body
-    lambdaBodyPrelude = do
-      let envPtr =
-            AST.LocalReference uint
-            $ AST.Name envVarName
+        lambdaName atl prologue (envVarName : vars) body
+    envPtr =
+      AST.LocalReference uint
+      $ AST.Name envVarName
+    prologue = do
       envPtrC <- inttoptr envPtr $ ptr est
       for (zip [0..] freeVars) $ \(ix,freeVar) -> do
-        localVar <- alloca uint
-        elementPtr <- getelementptr envPtrC ix
-        element <- load elementPtr
-        store localVar element
-        assign freeVar localVar
+        heapPtrPtr <- getelementptr envPtrC ix
+        heapPtrPtrC <- inttoptr heapPtrPtr $ ptr uint
+        heapPtr <- load heapPtrPtrC
+        heapPtrC <- inttoptr heapPtr $ ptr uint
+        assign freeVar heapPtrC
+
   --Adding llvm computations to add the lambda function and env struct
   --as globals in the llvm module
   modify $ \cgst -> cgst
@@ -244,7 +256,11 @@ cgen fe@(FuncExp vars body) = do
                $ fromMaybe
                    (error "bug - freevar filling")
     fvVal <- load fvPtr
-    setElemPtr envPtrC ix fvVal
+    heapPtr <- memalign 1
+    heapPtrC <- inttoptr heapPtr $ ptr uint
+    store heapPtrC fvVal
+    assign freeVar heapPtrC
+    setElemPtr envPtrC ix heapPtr
 
   setElemPtr returnedOprC 0 envPtr
 
