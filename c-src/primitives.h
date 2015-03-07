@@ -16,5 +16,6 @@ unsigned long cdr (unsigned long val);
 unsigned long isVector (unsigned long val);
 unsigned long vectorLength (unsigned long val);
 unsigned long vectorRef (unsigned long val, unsigned index);
+unsigned long vectorSet (unsigned long vec, unsigned index, unsigned long val);
 
 #endif // LC_PRIMITIVES

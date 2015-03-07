@@ -65,7 +65,8 @@ primFuncs =
   ,("make-vector", "makeVector")
   ,("vector?", "isVector")
   ,("vecor-length", "vectorLength")
-  ,("vectorRef", "vector-ref")
+  ,("vector-ref", "vectorRef")
+  ,("vector-set", "vectorSet")
   ]
 
 envVarName, suffPairStruct, suffLambda, suffEnvStruct :: String

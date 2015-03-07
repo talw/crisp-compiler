@@ -46,6 +46,10 @@ unsigned long isNumber (unsigned long val)
   return isTag (val, FIXNUM_TAG, FIXNUM_TAG_LEN);
 }
 
+// ------------------------------------------------------------------
+// LISTS
+// ------------------------------------------------------------------
+
 unsigned long isPair (unsigned long val)
 {
   return isTag (val, PAIR_TAG, PAIR_TAG_LEN);
@@ -74,6 +78,10 @@ unsigned long cdr (unsigned long val)
   return *(ptr+1);
 }
 
+// ------------------------------------------------------------------
+// VECTORS
+// ------------------------------------------------------------------
+
 unsigned long isVector (unsigned long val)
 {
   return isTag (val, VECTOR_TAG, VECTOR_TAG_LEN);
@@ -85,10 +93,22 @@ unsigned long vectorLength (unsigned long val)
   return *ptr;
 }
 
-unsigned long vectorRef (unsigned long val, unsigned index)
+unsigned long vectorRef (unsigned long val, unsigned long index)
 {
+  //TODO think, the users of this function are both from scheme and from C
+  //to divide by 4 or not?
+  index = index >> FIXNUM_TAG_LEN;
   unsigned long *ptr = val - VECTOR_TAG;
   return *(ptr + index + 1);
+}
+
+unsigned long vectorSet (unsigned long vec, unsigned long index, unsigned long val)
+{
+  index = index >> FIXNUM_TAG_LEN;
+  unsigned long *ptr = vec - VECTOR_TAG;
+  *(ptr + index + 1) = val;
+
+  return NIL_VALUE;
 }
 
 unsigned long makeVector (unsigned long size, unsigned long elem)

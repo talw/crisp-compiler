@@ -103,7 +103,7 @@ codegenFunction funcName argTys cmds args exprs = do
   cgenComputation = do
     resList <- traverse cgen exprs
     ret $ if null resList
-            then constUint 0
+            then constUint nilValue
             else last resList
   blks = createBlocks cgst
   extraFuncsComputations = extraFuncs cgst

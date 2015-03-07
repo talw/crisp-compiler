@@ -39,7 +39,7 @@ void showVector(unsigned long val)
 
   for (unsigned i=0; i < length; i++)
   {
-    showImmediate(vectorRef(val, i));
+    showImmediate(vectorRef(val, i << FIXNUM_TAG_LEN));
     if (i < length - 1)
       printf(" ");
   }
