@@ -62,11 +62,13 @@ primFuncs =
   ,("null?", "isNull")
   ,("car", "car")
   ,("cdr", "cdr")
+  ,("set-cdr!", "cdrSet")
+  ,("set-car!", "carSet")
   ,("make-vector", "makeVector")
   ,("vector?", "isVector")
   ,("vecor-length", "vectorLength")
   ,("vector-ref", "vectorRef")
-  ,("vector-set", "vectorSet")
+  ,("vector-set!", "vectorSet")
   ]
 
 envVarName, suffPairStruct, suffLambda, suffEnvStruct :: String

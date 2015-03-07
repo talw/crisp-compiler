@@ -78,6 +78,22 @@ unsigned long cdr (unsigned long val)
   return *(ptr+1);
 }
 
+unsigned long carSet (unsigned long pair, unsigned long val)
+{
+  unsigned long *ptr = pair - PAIR_TAG;
+  *ptr = val;
+
+  return NIL_VALUE;
+}
+
+unsigned long cdrSet (unsigned long pair, unsigned long val)
+{
+  unsigned long *ptr = pair - PAIR_TAG;
+  *(ptr+1) = val;
+
+  return NIL_VALUE;
+}
+
 // ------------------------------------------------------------------
 // VECTORS
 // ------------------------------------------------------------------
@@ -95,8 +111,6 @@ unsigned long vectorLength (unsigned long val)
 
 unsigned long vectorRef (unsigned long val, unsigned long index)
 {
-  //TODO think, the users of this function are both from scheme and from C
-  //to divide by 4 or not?
   index = index >> FIXNUM_TAG_LEN;
   unsigned long *ptr = val - VECTOR_TAG;
   return *(ptr + index + 1);
