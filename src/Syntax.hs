@@ -68,14 +68,15 @@ primFuncs =
   ,("vectorRef", "vector-ref")
   ]
 
-dataPrefix :: String
-dataPrefix = "'"
-
 envVarName, suffPairStruct, suffLambda, suffEnvStruct :: String
+dataPrefix, entryFuncName, expressionFuncName  :: String
 suffPairStruct = "-pairStruct"
 suffLambda = "-lambda"
 suffEnvStruct = "-envStruct"
 envVarName = "__env"
+dataPrefix = "'"
+entryFuncName = "entryFunc"
+expressionFuncName = "expressionFunc"
 
 data Expr
   = NumberExp Integer
@@ -85,14 +86,17 @@ data Expr
   | VarExp SymName
   | DefExp SymName Expr
   | IfExp Expr Expr Expr
-  | FuncExp [SymName] Expr
+  | FuncExp [SymName] [Expr]
   | CallExp Expr [Expr]
   | PrimCallExp SymName [Expr]
   | BinOpExp BinOp Expr Expr
   deriving (Eq, Ord, Show)
 
-findFreeVars :: [SymName] -> Expr -> [SymName]
-findFreeVars vars exp = S.toList $ go vars exp
+findFreeVars :: [SymName] -> [Expr] -> [SymName]
+findFreeVars vars exprs = S.toList
+                        . foldl' union S.empty
+                        . map (go vars)
+                        $ exprs
  where
   go vars (VarExp var) = if var `elem` vars then S.empty else S.singleton var
   go vars (BinOpExp _ e1 e2) = go vars e1 `union` go vars e2

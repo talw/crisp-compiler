@@ -60,21 +60,33 @@ delPrevMain = do
   modify $ \s -> s { AST.moduleDefinitions = filter filt md }
  where
   filt (AST.GlobalDefinition
-    (AST.Function { G.name = AST.Name "entryFunc", .. })) = False
+    (AST.Function { G.name = AST.Name funcName, .. }))
+    | funcName == entryFuncName = False
   filt _ = True
 
-codegenTop :: Expr -> LLVM ()
-codegenTop (DefExp name (FuncExp args body)) =
-  codegenFunction name argTys
-    (return ()) (FuncExp (envVarName : args) body)
+codegenTop :: [Expr] -> LLVM ()
+codegenTop exprs = do
+  traverse processDefiniton $ filter isDefinition exprs
+  processExpressions $ filter (not . isDefinition) exprs
  where
-  argTys = argsTypeList $ length args + 1
+  isDefinition (DefExp {}) = True
+  isDefinition  _ = False
 
-codegenTop expr =
-  codegenFunction "entryFunc" [] (return ()) (FuncExp [] expr)
+  genFunc name argTys argNms exprs =
+    codegenFunction name argTys (return ()) argNms exprs
 
-codegenFunction :: SymName -> [AST.Type] -> Codegen a -> Expr -> LLVM ()
-codegenFunction funcName argTys cmds (FuncExp args body) = do
+  processDefiniton (DefExp name (FuncExp args exprs)) =
+    genFunc name argTys argNms exprs
+   where
+    argTys = argsTypeList $ length args + 1
+    argNms = envVarName : args
+
+  processExpressions exprs =
+    genFunc entryFuncName [] [] exprs
+
+codegenFunction :: SymName -> [AST.Type] -> Codegen a
+                -> [SymName] -> [Expr] -> LLVM ()
+codegenFunction funcName argTys cmds args exprs = do
   defineFunc uint funcName fnargs blks
   sequence_ extraFuncsComputations
  where
@@ -87,7 +99,12 @@ codegenFunction funcName argTys cmds (FuncExp args body) = do
       store var (local (AST.Name a))
       assign a var
     cmds
-    cgen body >>= ret
+    cgenComputation
+  cgenComputation = do
+    resList <- traverse cgen exprs
+    ret $ if null resList
+            then constUint 0
+            else last resList
   blks = createBlocks cgst
   extraFuncsComputations = extraFuncs cgst
 
@@ -182,8 +199,6 @@ cgen (CallExp func args) = do
   operands <- traverse cgen args
   call funcPtrC $ envPtr : operands
 
---((lambda(x)(+ x ((lambda(y)(+ y x)) 2))) 5)
-
 cgen fe@(FuncExp vars body) = do
   cgst <- get
 
@@ -194,8 +209,8 @@ cgen fe@(FuncExp vars body) = do
     atl = argsTypeList $ length vars + 1
 
     createFuncComputation =
-      codegenFunction lambdaName atl lambdaBodyPrelude $
-      FuncExp (envVarName : vars) body
+      codegenFunction
+        lambdaName atl lambdaBodyPrelude (envVarName : vars) body
     lambdaBodyPrelude = do
       let envPtr =
             AST.LocalReference uint
@@ -339,12 +354,7 @@ codegen modl exprs = do
     Right newAst -> return newAst
     Left err     -> putStrLn err >> return preOptiAst
  where
-  deltaModl  = delPrevMain >> traverse codegenTop exprs
   preOptiAst = runLLVM modl deltaModl
   process = printAsm >=> optimize >=> jit
 
-  {-genEntryFunc = do-}
-  {-exprsToRunCount = length $ filter filt exprs-}
-   {-where-}
-    {-filt (DefExp {}) = False-}
-    {-filt _ = True-}
+  deltaModl = delPrevMain >> codegenTop exprs

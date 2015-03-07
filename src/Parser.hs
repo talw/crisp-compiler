@@ -51,7 +51,7 @@ defineP = reservedFuncP "define" $
 
 lambdaP :: Parser Expr
 lambdaP = reservedFuncP "lambda" $
-  FuncExp <$> LX.parens (many LX.identifier) <*> exprP
+  FuncExp <$> LX.parens (many LX.identifier) <*> many exprP
 
 ifP :: Parser Expr
 ifP = reservedFuncP "if" $
@@ -85,7 +85,7 @@ letP :: Parser Expr
 letP = reservedFuncP "let" $ do
   nameExprPairs <- LX.parens $
     many $ LX.parens $ (,) <$> LX.identifier <*> exprP
-  body <- exprP
+  body <- many exprP
   return $ CallExp
     (FuncExp (map fst nameExprPairs) body)
     $ map snd nameExprPairs

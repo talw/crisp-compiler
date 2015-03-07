@@ -13,6 +13,7 @@ import qualified LLVM.General.ExecutionEngine as EE
 import Control.Monad.Trans.Except (ExceptT(..))
 
 import Immediates (showImmediate)
+import Syntax (entryFuncName)
 
 foreign import ccall "dynamic" haskFun :: FunPtr (IO Word32) -> IO Word32
 
@@ -46,7 +47,7 @@ jit modl = ExceptT . withContext $ \context ->
   withEE context $ \executionEngine ->
     runExceptT . withModuleFromAST context modl $ \m -> do
       EE.withModuleInEngine executionEngine m $ \ee -> do
-        mainfn <- EE.getFunction ee (AST.Name "entryFunc")
+        mainfn <- EE.getFunction ee (AST.Name entryFuncName)
         case mainfn of
           Just fn -> do
             res <- run fn
