@@ -72,15 +72,11 @@ primFuncs =
   ,("vector-set!", "vectorSet")
   ]
 
-envVarName, suffPairStruct, suffLambda, suffEnvStruct :: String
-dataPrefix, entryFuncName, expressionFuncName  :: String
-suffPairStruct = "-pairStruct"
+envVarName, suffLambda, dataPrefix, entryFuncName :: String
 suffLambda = "-lambda"
-suffEnvStruct = "-envStruct"
 envVarName = "__env"
 dataPrefix = "'"
 entryFuncName = "entryFunc"
-expressionFuncName = "expressionFunc"
 
 data Expr
   = NumberExp Integer
