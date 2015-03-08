@@ -42,6 +42,13 @@ callP = LX.parens $ CallExp
   <$> (variableP <|> lambdaP)
   <*> many exprP
 
+listP :: Parser Expr
+listP = do
+  LX.reserved dataPrefix
+  LX.parens $ do
+    exprs <- many exprP
+    return $ foldr (\a acc -> PrimCallExp "cons" [a,acc]) EmptyExp exprs
+
 variableP :: Parser Expr
 variableP = VarExp <$> LX.identifier
 
@@ -109,6 +116,7 @@ exprP = LX.lexeme . asum . map try $
   , notP
   , andP
   , orP
+  , listP
   , letP
   , setP
   , lambdaP
