@@ -16,6 +16,7 @@ import Control.Applicative
 import LLVM.General.AST
 import LLVM.General.AST.Global
 import qualified LLVM.General.AST as AST
+import qualified LLVM.General.AST.Global as G
 
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Attribute as A
@@ -43,6 +44,14 @@ addDefn :: Definition -> LLVM ()
 addDefn d = do
   defs <- gets moduleDefinitions
   modify $ \s -> s { moduleDefinitions = defs ++ [d] }
+
+defineGlobalVar :: String -> LLVM ()
+defineGlobalVar varName = addDefn $
+  GlobalDefinition $ globalVariableDefaults {
+    name = Name varName
+  , G.type' = uint
+  , initializer = Just $ C.Int uintSize 0
+  }
 
 defineFunc :: Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 defineFunc retty label argtys body = addDefn $
@@ -112,6 +121,7 @@ data CodegenState
   , names        :: Names                    -- Name Supply
   , extraFuncs   :: [LLVM ()]                -- LLVM computations of lambdas
   , funcName     :: SymName                  -- 'CodegenState's function name
+  , globalVars   :: [SymName]
   } {-deriving Show-}
 
 data BlockState
@@ -148,7 +158,8 @@ emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: SymName -> CodegenState
 emptyCodegen fname =
-  CodegenState (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty [] fname
+  CodegenState
+    (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty [] fname []
 
 execCodegen :: SymName -> Codegen a -> CodegenState
 execCodegen fname computation =

@@ -47,7 +47,7 @@ variableP = VarExp <$> LX.identifier
 
 defineP :: Parser Expr
 defineP = reservedFuncP "define" $
-  DefExp <$> LX.identifier <*> exprP
+    DefExp <$> LX.identifier <*> exprP
 
 lambdaP :: Parser Expr
 lambdaP = reservedFuncP "lambda" $

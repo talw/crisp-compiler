@@ -67,23 +67,24 @@ delPrevMain = do
 
 codegenTop :: [Expr] -> LLVM ()
 codegenTop exprs = do
-  traverse processDefiniton $ filter isDefinition exprs
-  processExpressions $ filter (not . isDefinition) exprs
+  traverse processDefiniton $ filter needsDefining exprs
+  processExpressions exprs
+  {-processExpressions $ filter needsExpressing exprs-}
  where
-  isDefinition (DefExp {}) = True
-  isDefinition  _ = False
+  needsDefining (DefExp {}) = True
+  needsDefining _ = False
 
   genFunc name argTys argNms exprs =
     codegenFunction name argTys (return ()) argNms exprs
 
-  processDefiniton (DefExp name (FuncExp args exprs)) =
-    genFunc name argTys argNms exprs
-   where
-    argTys = argsTypeList $ length args + 1
-    argNms = envVarName : args
+  processDefiniton (DefExp name expr) =
+    codegenGlobalVar name
 
   processExpressions exprs =
     genFunc entryFuncName [] [] exprs
+
+codegenGlobalVar :: SymName -> LLVM()
+codegenGlobalVar = defineGlobalVar
 
 codegenFunction :: SymName -> [AST.Type] -> Codegen a
                 -> [SymName] -> [Expr] -> LLVM ()
@@ -161,26 +162,11 @@ asIRbinOp Gt   = comp IP.UGT
 asIRbinOp Gte  = comp IP.UGE
 asIRbinOp Eq   = comp IP.EQ
 
+-------------------------------------------------------------------------------
+-- Translation of Expr values into llvm IR
+-------------------------------------------------------------------------------
+
 cgen :: Expr -> Codegen AST.Operand
-
-cgen (VarExp varName) =
-  {-maybe funcWithEmptyEnv load =<< getvar varName-}
-  maybe funcWithEmptyEnv load =<< getvar varName
- where
-  funcWithEmptyEnv = do
-    pair <- malloc 2
-    pairC <- inttoptr pair $ ptr $ structType [uint, uint]
-
-    funcOprC <- ptrtoint (extern $ AST.Name varName) uint
-    setElemPtr pairC 1 funcOprC
-    return pair
-
-cgen (SetExp varName expr) = do
-  ptr <- maybe (error errMsg) return =<< getvar varName
-  store ptr =<< cgen expr
-  return $ constUint nilValue
- where
-  errMsg = printf "variable: %s, was not found" varName
 
 cgen (BoolExp True) = return . constUint $ IM.true
 cgen (BoolExp False) = return . constUint $ IM.false
@@ -192,6 +178,22 @@ cgen (BinOpExp op a b) = do
   ca <- cgen a
   cb <- cgen b
   asIRbinOp op ca cb
+
+cgen (VarExp varName) =
+  maybe planB load =<< getvar varName
+ where
+  planB = load $ extern (AST.Name varName)
+
+cgen (DefExp defName expr) = do
+  gvs <- gets globalVars
+  modify $ \s -> s { globalVars = defName : gvs }
+  cgen (SetExp defName expr)
+
+cgen (SetExp symName expr) = do
+  mVarPtr <- getvar symName
+  let ptr = fromMaybe (extern $ AST.Name symName) mVarPtr
+  store ptr =<< cgen expr
+  return $ constUint nilValue
 
 cgen (PrimCallExp primName args) = do
   operands <- traverse cgen args
@@ -216,6 +218,7 @@ cgen fe@(FuncExp vars body) = do
   let
     (lambdaName, supply) =
       uniqueName (funcName cgst ++ suffLambda) $ names cgst
+    freeVars = sort $ findFreeVars (globalVars cgst ++ vars) body
     est = envStructType freeVars
     atl = argsTypeList $ length vars + 1
 
@@ -243,7 +246,6 @@ cgen fe@(FuncExp vars body) = do
     , names = supply
     }
 
-
   --Setting up the operand to return
   returnedOpr <- malloc 2
   returnedOprC <- inttoptr returnedOpr $ ptr $ structType [uint, uint]
@@ -268,8 +270,6 @@ cgen fe@(FuncExp vars body) = do
   setElemPtr returnedOprC 1 funcOprC
 
   return returnedOpr
- where
-  freeVars = sort $ findFreeVars vars body
 
 cgen (IfExp cond tr fl) = do
   ifthen <- addBlock "if.then"
@@ -301,11 +301,6 @@ cgen (IfExp cond tr fl) = do
 
 cgen _ = error "cgen called with unexpected Expr"
 --cgen (S.UnaryOp op a) = cgen $ S.Call ("unary" ++ op) [a]
---cgen (S.BinaryOp "=" (S.Var var) val) = do
-  --a <- getvar var
-  --cval <- cgen val
-  --store a cval
-  --return cval
 
 -------------------------------------------------------------------------------
 -- Composite Types
