@@ -72,10 +72,11 @@ primFuncs =
   ,("vector-set!", "vectorSet")
   ]
 
-envVarName, suffLambda, dataPrefix, entryFuncName :: String
+envVarName, suffLambda, dataPrefix, vectorPrefix, entryFuncName :: String
 suffLambda = "-lambda"
 envVarName = "__env"
 dataPrefix = "'"
+vectorPrefix = "#"
 entryFuncName = "entryFunc"
 
 data Expr
@@ -83,6 +84,7 @@ data Expr
   | EmptyExp
   | CharExp Char
   | BoolExp Bool
+  | ArrayExp [Expr]
   | VarExp SymName
   | SetExp SymName Expr
   | DefExp SymName Expr

@@ -41,6 +41,7 @@ import Paths_lc_hs (getDataDir)
 import System.FilePath ((</>))
 import Debug.Trace (trace)
 import Text.Printf (printf)
+import Utils (readBinary)
 
 argsTypeList :: Int -> [AST.Type]
 argsTypeList n = replicate n uint
@@ -173,6 +174,20 @@ cgen (BoolExp False) = return . constUint $ IM.false
 cgen (NumberExp n) = return . constUint . toFixnum $ n
 cgen (CharExp c) = return . constUint . toChar $ c
 cgen EmptyExp = return . constUint $ nilValue
+
+cgen (ArrayExp exprs) = do
+  vecPtr <- memalign $ exprCount + 1
+  vecPtrC <- inttoptr vecPtr $ ptr uint
+  store vecPtrC $ constUint exprCount
+
+  for (zip [1..] exprs) $ \(i, expr) -> do
+    opr <- cgen expr
+    targetPtr <- getelementptrRaw vecPtrC [i]
+    store targetPtr opr
+
+  iadd vecPtr $ constUint $ readBinary vectorFormat
+ where
+  exprCount = length exprs
 
 cgen (BinOpExp op a b) = do
   ca <- cgen a

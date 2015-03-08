@@ -30,7 +30,7 @@ charFormat   = "00001111"
 nilFormat    = "00111111"
 boolFormat   = "0*101111"
 pairFormat   =      "001"
-vectorFormat   =      "101"
+vectorFormat =      "101"
 
 nilValue :: Word32
 nilValue = readBinary nilFormat
