@@ -85,6 +85,7 @@ data Expr
   | CharExp Char
   | BoolExp Bool
   | ArrayExp [Expr]
+  | StringExp String
   | VarExp SymName
   | SetExp SymName Expr
   | DefExp SymName Expr

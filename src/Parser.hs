@@ -54,6 +54,10 @@ arrayP = do
   LX.reserved vectorPrefix
   LX.parens $ ArrayExp <$> many exprP
 
+stringP :: Parser Expr
+stringP =
+  StringExp <$> LX.stringLiteral
+
 variableP :: Parser Expr
 variableP = VarExp <$> LX.identifier
 
@@ -123,6 +127,7 @@ exprP = LX.lexeme . asum . map try $
   , orP
   , listP
   , arrayP
+  , stringP
   , letP
   , setP
   , lambdaP

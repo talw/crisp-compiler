@@ -23,6 +23,7 @@ import Data.Traversable
 import Data.Functor ((<$>))
 import Data.List (sort)
 import Data.Maybe (fromJust, fromMaybe)
+import Data.Char (ord)
 import Control.Applicative ((<|>))
 import Control.Monad.Trans.Except
 import Control.Monad
@@ -39,7 +40,7 @@ import qualified Immediates as IM
 
 import Paths_lc_hs (getDataDir)
 import System.FilePath ((</>))
-import Debug.Trace (trace)
+import Debug.Trace (trace, traceShowId)
 import Text.Printf (printf)
 import Utils (readBinary)
 
@@ -132,10 +133,15 @@ malloc size =
   call (funcOpr uint (AST.Name "malloc") [AST.IntegerType 64])
               [constUintSize 64 $ uintSizeBytes * size]
 
-memalign :: Int -> Codegen AST.Operand
-memalign size =
+memalignRaw :: Int -> Codegen AST.Operand
+memalignRaw  sizeInBytes =
   call (funcOpr uint (AST.Name "memalign") $ replicate 2 $ AST.IntegerType 64)
-    $ map (constUintSize 64) [1, uintSizeBytes * size]
+    $ map (constUintSize 64) [1, sizeInBytes]
+
+memalign :: Int -> Codegen AST.Operand
+memalign sizeInWords = memalignRaw $ sizeInWords * uintSizeBytes
+  {-call (funcOpr uint (AST.Name "memalign") $ replicate 2 $ AST.IntegerType 64)-}
+    {-$ map (constUintSize 64) [1, uintSizeBytes * size]-}
 
 comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 comp ip a b = do
@@ -174,6 +180,22 @@ cgen (BoolExp False) = return . constUint $ IM.false
 cgen (NumberExp n) = return . constUint . toFixnum $ n
 cgen (CharExp c) = return . constUint . toChar $ c
 cgen EmptyExp = return . constUint $ nilValue
+
+cgen (StringExp str) = do
+  vecPtr <- memalignRaw $ uintSizeBytes + strLen
+  vecPtrC <- inttoptr vecPtr $ ptr uint
+  store vecPtrC $ constUint strLen
+
+
+  bytePtr <- flip bitcast i8ptr =<< getelementptrRaw vecPtrC [1]
+  for (zip [0..] str) $ \(i, char) -> do
+    let opr = constUintSize 8 $ trace ("look at me: " ++ (show (ord char))) $ ord char
+    targetPtr <- getelementptrRaw bytePtr [i]
+    store targetPtr opr
+
+  iadd vecPtr $ constUint $ readBinary stringFormat
+ where
+  strLen = length str
 
 cgen (ArrayExp exprs) = do
   vecPtr <- memalign $ exprCount + 1

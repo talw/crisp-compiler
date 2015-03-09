@@ -25,12 +25,14 @@ shiftWidthOfFormat = length . takeWhile (/= '*') . reverse
 
 fixnumFormat, charFormat, nilFormat  :: String
 boolFormat, pairFormat, vectorFormat :: String
+stringFormat :: String
 fixnumFormat =       "00"
 charFormat   = "00001111"
 nilFormat    = "00111111"
 boolFormat   = "0*101111"
 pairFormat   =      "001"
 vectorFormat =      "101"
+stringFormat =      "110"
 
 nilValue :: Word32
 nilValue = readBinary nilFormat
@@ -56,6 +58,7 @@ showImmediate n =
     , (nilFormat, const "()")
     , (pairFormat, mustCompileHandler "pair")
     , (vectorFormat, mustCompileHandler "vector")
+    , (stringFormat, mustCompileHandler "string")
     ]
 
  where
