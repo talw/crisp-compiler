@@ -40,7 +40,6 @@ import qualified Immediates as IM
 
 import Paths_lc_hs (getDataDir)
 import System.FilePath ((</>))
-import Debug.Trace (trace, traceShowId)
 import Text.Printf (printf)
 import Utils (readBinary)
 
@@ -189,7 +188,7 @@ cgen (StringExp str) = do
 
   bytePtr <- flip bitcast i8ptr =<< getelementptrRaw vecPtrC [1]
   for (zip [0..] str) $ \(i, char) -> do
-    let opr = constUintSize 8 $ trace ("look at me: " ++ (show (ord char))) $ ord char
+    let opr = constUintSize 8 $ ord char
     targetPtr <- getelementptrRaw bytePtr [i]
     store targetPtr opr
 

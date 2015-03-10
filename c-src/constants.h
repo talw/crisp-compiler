@@ -13,5 +13,7 @@ const int PAIR_TAG;
 const int PAIR_TAG_LEN;
 const int VECTOR_TAG;
 const int VECTOR_TAG_LEN;
+const int STRING_TAG;
+const int STRING_TAG_LEN;
 
 #endif // LC_CONSTS

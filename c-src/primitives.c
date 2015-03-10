@@ -95,6 +95,24 @@ unsigned long cdrSet (unsigned long pair, unsigned long val)
 }
 
 // ------------------------------------------------------------------
+// Common functions for VECTORS and STRINGS
+// ------------------------------------------------------------------
+
+unsigned char* getArrayPtr
+  (unsigned long val, unsigned index, int tag, char elemSize)
+{
+  index = index >> FIXNUM_TAG_LEN;
+  unsigned char *ptr = val - tag;
+  return ptr + sizeof(long) + index*elemSize;
+}
+
+unsigned long arrayLength (unsigned long val, int tag)
+{
+  unsigned long *ptr = val - tag;
+  return *ptr;
+}
+
+// ------------------------------------------------------------------
 // VECTORS
 // ------------------------------------------------------------------
 
@@ -105,15 +123,14 @@ unsigned long isVector (unsigned long val)
 
 unsigned long vectorLength (unsigned long val)
 {
-  unsigned long *ptr = val - VECTOR_TAG;
-  return *ptr;
+  return arrayLength (val, VECTOR_TAG);
 }
 
 unsigned long vectorRef (unsigned long val, unsigned long index)
 {
-  index = index >> FIXNUM_TAG_LEN;
-  unsigned long *ptr = val - VECTOR_TAG;
-  return *(ptr + index + 1);
+  unsigned long *ptr =
+    (unsigned long *) getArrayPtr(val, index, VECTOR_TAG, sizeof(long));
+  return *ptr;
 }
 
 unsigned long vectorSet (unsigned long vec, unsigned long index, unsigned long val)
@@ -137,4 +154,25 @@ unsigned long makeVector (unsigned long size, unsigned long elem)
     *(ptr + i) = elem;
 
   return ((unsigned long) ptr) + VECTOR_TAG;
+}
+
+// ------------------------------------------------------------------
+// STRINGS
+// ------------------------------------------------------------------
+
+unsigned long isString (unsigned long val)
+{
+  return isTag (val, STRING_TAG, STRING_TAG_LEN);
+}
+
+unsigned long stringLength (unsigned long val)
+{
+  return arrayLength (val, STRING_TAG);
+}
+
+unsigned char stringRef (unsigned long val, unsigned long index)
+{
+  unsigned char *ptr =
+    getArrayPtr(val, index, STRING_TAG, sizeof(char));
+  return *ptr;
 }

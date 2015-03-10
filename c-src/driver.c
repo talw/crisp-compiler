@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <wchar.h>
 
 #include "constants.h"
 #include "primitives.h"
@@ -9,10 +10,6 @@ void showImmediate(unsigned long val);
 
 void showCons(unsigned long val)
 {
-  /*unsigned long *ptr = val - 1;*/
-  /*unsigned long head = *ptr;*/
-  /*unsigned long tail = *(ptr + 1);*/
-
   showImmediate(car(val));
 
   if (isPair(cdr(val)) == TRUE_VALUE)
@@ -29,6 +26,22 @@ void showCons(unsigned long val)
     printf(" . ");
     showImmediate(cdr(val));
   }
+}
+
+void showString(unsigned long val)
+{
+  unsigned long length = stringLength(val, STRING_TAG);
+
+  printf("\"");
+
+  for (unsigned i=0; i < length; i++)
+  {
+    unsigned char bla = stringRef(val, i << FIXNUM_TAG_LEN);
+
+    printf("%c", bla);
+  }
+
+  printf("\"");
 }
 
 void showVector(unsigned long val)
@@ -49,9 +62,6 @@ void showVector(unsigned long val)
 
 void showImmediate(unsigned long val)
 {
-  //printf("got value: %d\n", val);
-  //printf("got value: %#08x\n", val);
-
   if (val == TRUE_VALUE)
     printf("#t");
   else if (val == FALSE_VALUE)
@@ -69,7 +79,9 @@ void showImmediate(unsigned long val)
     printf(")");
   }
   else if (isVector(val) == TRUE_VALUE)
-    showVector(val); //TODO is it safe?
+    showVector(val);
+  else if (isString(val) == TRUE_VALUE)
+    showString(val);
   else
     printf("Unrecognized value");
 
