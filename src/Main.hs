@@ -1,61 +1,70 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Main where
 
 import Parser
 import Emit
-{-import Codegen-}
+import Options
 
 import System.Console.Haskeline
 import System.Environment (getArgs)
 
 import qualified LLVM.General.AST as AST
 import Data.Functor (void)
+import Data.Maybe (fromJust)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT(..))
 
-defaultOutputFileName :: String
-defaultOutputFileName = "a.out"
+processFile :: CompilerOptions -> AST.Module -> ExceptT String IO AST.Module
+processFile opts@CompilerOptions{..} initMod = ExceptT $
+  readFile optInputFilePath >>= process opts initMod
 
-{-processFile :: FilePath -> AST.Module -> IO (Either String AST.Module)-}
-processFile :: FilePath -> AST.Module -> ExceptT String IO AST.Module
-processFile fname initMod = ExceptT $ readFile fname >>= process initMod
-
-repl :: AST.Module -> IO ()
-repl initMod = runInputT defaultSettings . loop $ initMod
+repl :: CompilerOptions -> AST.Module -> IO ()
+repl opts@(CompilerOptions {..}) initMod =
+  runInputT defaultSettings . loop $ initMod
  where loop modl = do
          minput <- getInputLine "ready> "
          case minput of
            Nothing -> outputStrLn "Goodbye."
            Just input -> do
-             mmodl' <- liftIO $ process modl input
+             mmodl' <- liftIO $ process opts modl input
              case mmodl' of
                Right modl' -> loop modl'
                Left err -> do
                  outputStrLn err
                  loop modl
 
-process :: AST.Module -> String -> IO (Either String AST.Module)
-process modl source = do
+process :: CompilerOptions -> AST.Module -> String
+        -> IO (Either String AST.Module)
+process opts@CompilerOptions{..} modl source = do
   let res = parseExpr source
   case res of
     Left err -> return . Left $ show err
     Right exprs -> do
       print exprs
-      modl' <- codegen modl exprs
+      modl' <- codegen opts modl exprs
       return . Right $ modl'
 
 main :: IO ()
 main = do
   args <- getArgs
-  case args of
-    []      -> emodAction False repl
-    ifn : ofn : _ -> emodAction True $ compile ifn ofn
+  opts@CompilerOptions{..} <- getOptions args
+  emodAction optReplMode $
+    if optReplMode
+      then repl opts
+      else compile opts
+  --case args of
+    --[]      -> emodAction False repl
+    --ifn : ofn : _ -> emodAction True $ compile optInputFilePath optOutputFilePath
  where
-  emodAction isCompiled action =
-    either putStrLn action =<< initModule isCompiled "default module"
+  emodAction isRepl action =
+    either putStrLn action =<< initModule (not isRepl) "default module"
 
-compile :: FilePath -> FilePath -> AST.Module -> IO ()
-compile ifn ofn astMod = do
-  eRes <- runExceptT $ writeTargetCode ifn ofn =<< processFile ifn astMod
+compile :: CompilerOptions -> AST.Module -> IO ()
+compile opts@CompilerOptions{..} astMod = do
+  eRes <- runExceptT $
+    processFile opts astMod
+    >>= writeTargetCode opts
   case eRes of
     Left err -> putStrLn err
     Right () -> putStrLn "Compiled successfully."

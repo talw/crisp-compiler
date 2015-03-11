@@ -24,6 +24,7 @@ import Data.Functor ((<$>))
 import Data.List (sort)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Char (ord)
+import Data.Bool (bool)
 import Control.Applicative ((<|>))
 import Control.Monad.Trans.Except
 import Control.Monad
@@ -36,6 +37,7 @@ import Codegen
 import qualified Codegen as CG
 import Syntax
 import JIT
+import Options
 import Immediates hiding (false, true)
 import qualified Immediates as IM
 
@@ -382,14 +384,14 @@ linkModule fp modlAST = ExceptT $ withContext $ \context -> do
         liftIO $ moduleAST modl
   return $ either (Left . show) id result
 
-writeTargetCode :: FilePath -> FilePath
+writeTargetCode :: CompilerOptions
                 -> AST.Module -> ExceptT String IO ()
-writeTargetCode ifn ofn astMod = do
+writeTargetCode CompilerOptions{..} astMod = do
   writeObjFile
   void . liftIO . createProcess $
-    proc "gcc" ["-lm", objfn, "-o", ofn]
+    proc "gcc" ["-lm", objfn, "-o", optOutputFilePath]
  where
-  objfn = ifn ++ ".o"
+  objfn = optInputFilePath ++ ".o"
   writeObjFile = ExceptT $
     withContext $ \context ->
       fmap join . runExceptT . withModuleFromAST context astMod $ \mod ->
@@ -403,14 +405,17 @@ printAsm modl = ExceptT $ withContext $ \context ->
     putStrLn =<< moduleLLVMAssembly m
     return modl
 
-codegen :: AST.Module -> [Expr] -> IO AST.Module
-codegen modl exprs = do
+codegen :: CompilerOptions -> AST.Module -> [Expr] -> IO AST.Module
+codegen CompilerOptions{..} modl exprs = do
   res <- runExceptT $ process preOptiAst
   case res of
     Right newAst -> return newAst
     Left err     -> putStrLn err >> return preOptiAst
  where
   preOptiAst = runLLVM modl deltaModl
-  process = printAsm >=> optimize >=> jit
+  process = bool return printAsm optPrintLLVM
+        >=> optimize
+        >=> bool return jit optReplMode
+  --process = printAsm >=> optimize >=> jit
 
   deltaModl = delPrevMain >> codegenTop exprs

@@ -12,7 +12,6 @@ import Data.Char (chr, ord)
 
 import Utils
 import Text.Printf (printf)
-import Control.Arrow ((>>>))
 
 maskOfFormat :: String -> Word32
 maskOfFormat = readBinary . tr "0*" "10"
@@ -62,8 +61,8 @@ showImmediate n =
     ]
 
  where
-  mustCompileHandler typeName = (* 8) >>>
-    printf "To display %ss, please compile normally. %d" typeName
+  mustCompileHandler typeName = const $
+    printf "To display %ss, execute the resulting binary." typeName
 
   handleValueOfType :: [(String, Word32 -> String)] -> String
   handleValueOfType = foldr combineHandlers ""
