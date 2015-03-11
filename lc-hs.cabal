@@ -33,6 +33,7 @@ executable lc-hs
                      , transformers ==0.3.0.0
                      , transformers-compat ==0.3.3.3
                      , filepath ==1.3.*
+                     , process ==1.2.*
   hs-source-dirs:      src
   default-language:    Haskell2010
   GHC-Options:         -Wall

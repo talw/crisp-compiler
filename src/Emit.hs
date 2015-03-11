@@ -30,6 +30,7 @@ import Control.Monad
 import Control.Monad.State (modify, gets, get)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Maybe (MaybeT(..))
+import System.Process
 
 import Codegen
 import qualified Codegen as CG
@@ -381,12 +382,20 @@ linkModule fp modlAST = ExceptT $ withContext $ \context -> do
         liftIO $ moduleAST modl
   return $ either (Left . show) id result
 
-writeTargetCode :: FilePath -> AST.Module -> ExceptT String IO ()
-writeTargetCode fn astMod = ExceptT $
-  withContext $ \context ->
-    fmap join . runExceptT . withModuleFromAST context astMod $ \mod ->
-      fmap join . runExceptT . withDefaultTargetMachine $ \target ->
-        runExceptT $ writeObjectToFile target (File $ fn ++ ".o") mod
+writeTargetCode :: FilePath -> FilePath
+                -> AST.Module -> ExceptT String IO ()
+writeTargetCode ifn ofn astMod = do
+  writeObjFile
+  void . liftIO . createProcess $
+    proc "gcc" ["-lm", objfn, "-o", ofn]
+ where
+  objfn = ifn ++ ".o"
+  writeObjFile = ExceptT $
+    withContext $ \context ->
+      fmap join . runExceptT . withModuleFromAST context astMod $ \mod ->
+        fmap join . runExceptT . withDefaultTargetMachine $ \target ->
+          runExceptT $ writeObjectToFile target (File objfn) mod
+
 
 printAsm :: AST.Module -> ExceptT String IO AST.Module
 printAsm modl = ExceptT $ withContext $ \context ->

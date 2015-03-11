@@ -12,6 +12,8 @@ import Data.Functor (void)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT(..))
 
+defaultOutputFileName :: String
+defaultOutputFileName = "a.out"
 
 {-processFile :: FilePath -> AST.Module -> IO (Either String AST.Module)-}
 processFile :: FilePath -> AST.Module -> ExceptT String IO AST.Module
@@ -46,14 +48,14 @@ main = do
   args <- getArgs
   case args of
     []      -> emodAction False repl
-    fname : _ -> emodAction True $ compile fname
+    ifn : ofn : _ -> emodAction True $ compile ifn ofn
  where
   emodAction isCompiled action =
     either putStrLn action =<< initModule isCompiled "default module"
 
-compile :: FilePath -> AST.Module -> IO ()
-compile fname astMod = do
-  eRes <- runExceptT $ writeTargetCode fname =<< processFile fname astMod
+compile :: FilePath -> FilePath -> AST.Module -> IO ()
+compile ifn ofn astMod = do
+  eRes <- runExceptT $ writeTargetCode ifn ofn =<< processFile ifn astMod
   case eRes of
     Left err -> putStrLn err
     Right () -> putStrLn "Compiled successfully."
