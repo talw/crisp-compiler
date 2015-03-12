@@ -12,7 +12,7 @@ import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
 import qualified LLVM.General.AST.IntegerPredicate as IP
 import LLVM.General.AST.Type (ptr)
-import LLVM.General.AST (Instruction(GetElementPtr))
+import LLVM.General.AST (Instruction(GetElementPtr), moduleDefinitions)
 import LLVM.General (moduleLLVMAssembly, withModuleFromAST)
 import LLVM.General.Context (withContext)
 import LLVM.General.Module
@@ -21,8 +21,8 @@ import LLVM.General.Target (withDefaultTargetMachine)
 
 import Data.Traversable
 import Data.Functor ((<$>))
-import Data.List (sort)
-import Data.Maybe (fromJust, fromMaybe)
+import Data.List (sort, delete)
+import Data.Maybe (fromJust, fromMaybe, listToMaybe)
 import Data.Char (ord)
 import Data.Bool (bool)
 import Control.Applicative ((<|>))
@@ -59,45 +59,92 @@ setElemPtr :: AST.Operand -> Int -> AST.Operand -> Codegen AST.Operand
 setElemPtr struct ix item =
   getelementptr struct ix >>= flip store item
 
-delPrevMain :: LLVM ()
-delPrevMain = do
-  md <- gets AST.moduleDefinitions
-  modify $ \s -> s { AST.moduleDefinitions = filter filt md }
+getFuncDefinition :: SymName -> [AST.Definition] -> Maybe AST.Definition
+getFuncDefinition searchedName modDefs =
+  listToMaybe . filter filt $ modDefs
  where
-  filt (AST.GlobalDefinition
-    (AST.Function { G.name = AST.Name funcName, .. }))
-    | funcName == entryFuncName = False
-  filt _ = True
+  filt
+    (AST.GlobalDefinition
+      (AST.Function { G.name = AST.Name funcName, .. }))
+    | funcName == searchedName = True
+  filt _ = False
 
-codegenTop :: [Expr] -> LLVM ()
-codegenTop exprs = do
-  traverse processDefiniton $ filter needsDefining exprs
-  processExpressions exprs
+delPrevMain :: LLVM ()
+delPrevMain = delFuncDef entryFuncName
+
+delFuncDef :: String -> LLVM ()
+delFuncDef fname = do
+  mFuncDef <- gets $ getFuncDefinition fname . moduleDefinitions
+  maybe (return ()) del mFuncDef
+ where
+  del funcDef =
+    modify $ \mod ->
+      mod { AST.moduleDefinitions = delete funcDef $ moduleDefinitions mod }
+  --modify $ \s -> s { AST.moduleDefinitions = filter filt md }
+ --where
+  --filt (AST.GlobalDefinition
+    --(AST.Function { G.name = AST.Name funcName, .. }))
+     -- | funcName == entryFuncName = False
+  --filt _ = True
+
+codegenTop :: [Expr] -> [Expr] -> LLVM ()
+codegenTop nonDefExprs defExprs  = do
+  --traverse processDefiniton $ definitions
+  --processExpressions2 definitions
+  processDefinitons
+  processExpressions
   {-processExpressions $ filter needsExpressing exprs-}
  where
-  needsDefining (DefExp {}) = True
-  needsDefining _ = False
+  {-isDefinition (DefExp {}) = True-}
+  {-isDefinition _ = False-}
 
-  genFunc name argTys argNms exprs =
-    codegenFunction name argTys (return ()) argNms exprs
+  globalVars = flip map defExprs $ \(DefExp name _) -> name
+  processExpressions =
+    codegenFunction entryFuncName [] bodyPrelude [] globalVars nonDefExprs
+   where bodyPrelude = call (funcOpr uint (AST.Name initGlobalsFuncName) []) []
 
-  processDefiniton (DefExp name expr) =
-    codegenGlobalVar name
+  processDefinitons = do
+    traverse processDefiniton defExprs
 
-  processExpressions exprs =
-    genFunc entryFuncName [] [] exprs
+    delFuncDef initGlobalsFuncName
+    codegenFunction initGlobalsFuncName [] (return ()) [] globalVars defExprs
+   where
+    {-definitions = filter isDefinition exprs-}
+    processDefiniton (DefExp name expr) =
+      codegenGlobalVar name
+
+  {-processExpressions2 exprs = do-}
+    {-modDefs <- gets moduleDefinitions-}
+    {-case getFuncDefinition initGlobalsFuncName modDefs of-}
+      {-Nothing -> genFunc initGlobalsFuncName [] [] exprs-}
+
+      {-Just (AST.GlobalDefinition prevDef@G.Function{..}) ->-}
+        {-let-}
+          {-prevEntryBlock = head basicBlocks-}
+          {-entryBlockDelta =-}
+            {-head . createBlocks . execCodegen initGlobalsFuncName $ do-}
+              {-addBlock entryBlockName-}
+              {-traverse cgen exprs-}
+          {-newEntryBlock = mergeBlocks entryBlockDelta prevEntryBlock-}
+          {-basicBlocks' = newEntryBlock : tail basicBlocks-}
+          {-newDef = AST.GlobalDefinition prevDef { G.basicBlocks = basicBlocks' }-}
+        {-in-}
+          {-do-}
+            {-delFuncDef initGlobalsFuncName-}
+            {-modify $-}
+              {-\mod -> mod { moduleDefinitions = newDef : moduleDefinitions mod }-}
 
 codegenGlobalVar :: SymName -> LLVM()
 codegenGlobalVar = defineGlobalVar
 
 codegenFunction :: SymName -> [AST.Type] -> Codegen a
-                -> [SymName] -> [Expr] -> LLVM ()
-codegenFunction funcName argTys prologue args exprs = do
+                -> [SymName] -> [SymName] -> [Expr] -> LLVM ()
+codegenFunction funcName argTys prologue args globalVars exprs = do
   defineFunc uint funcName fnargs blks
   sequence_ extraFuncsComputations
  where
   fnargs = zip argTys $ map AST.Name args
-  cgst = execCodegen funcName $ do
+  cgst = execCodegen funcName globalVars $ do
     blk <- addBlock entryBlockName
     setBlock blk
     for args $ \a -> do
@@ -121,8 +168,8 @@ codegenType :: SymName -> AST.Type -> LLVM ()
 codegenType = defineType
 
 codegenExterns :: LLVM ()
-codegenExterns = do
-  external uint "malloc"   [(AST.IntegerType 64, AST.Name "size")]
+codegenExterns =
+  --external uint "malloc"   [(AST.IntegerType 64, AST.Name "size")]
   external uint "memalign" [(AST.IntegerType 64, AST.Name "alignment")
                            ,(AST.IntegerType 64, AST.Name "size") ]
 
@@ -130,10 +177,10 @@ codegenExterns = do
 -- Operations
 -------------------------------------------------------------------------------
 
-malloc :: Int -> Codegen AST.Operand
-malloc size =
-  call (funcOpr uint (AST.Name "malloc") [AST.IntegerType 64])
-              [constUintSize 64 $ uintSizeBytes * size]
+--malloc :: Int -> Codegen AST.Operand
+--malloc size =
+  --call (funcOpr uint (AST.Name "malloc") [AST.IntegerType 64])
+              --[constUintSize 64 $ uintSizeBytes * size]
 
 memalignRaw :: Int -> Codegen AST.Operand
 memalignRaw  sizeInBytes =
@@ -263,7 +310,7 @@ cgen fe@(FuncExp vars body) = do
 
     createFuncComputation =
       codegenFunction
-        lambdaName atl prologue (envVarName : vars) body
+        lambdaName atl prologue (envVarName : vars) (globalVars cgst) body
     envPtr =
       AST.LocalReference uint
       $ AST.Name envVarName
@@ -286,11 +333,13 @@ cgen fe@(FuncExp vars body) = do
     }
 
   --Setting up the operand to return
-  returnedOpr <- malloc 2
+  --returnedOpr <- malloc 2
+  returnedOpr <- memalign 2
   returnedOprC <- inttoptr returnedOpr $ ptr $ structType [uint, uint]
 
   --Instantiating an env struct and filling it
-  envPtr <- malloc $ length freeVars
+  --envPtr <- malloc $ length freeVars
+  envPtr <- memalign $ length freeVars
   envPtrC <- inttoptr envPtr $ ptr est
   for (zip [0..] freeVars) $ \(ix,freeVar) -> do
     fvPtr <- flip liftM (getvar freeVar)
@@ -405,8 +454,8 @@ printAsm modl = ExceptT $ withContext $ \context ->
     putStrLn =<< moduleLLVMAssembly m
     return modl
 
-codegen :: CompilerOptions -> AST.Module -> [Expr] -> IO AST.Module
-codegen CompilerOptions{..} modl exprs = do
+codegen :: CompilerOptions -> AST.Module -> [Expr] -> [Expr] -> IO AST.Module
+codegen CompilerOptions{..} modl nonDefExprs defExprs = do
   res <- runExceptT $ process preOptiAst
   case res of
     Right newAst -> return newAst
@@ -418,4 +467,4 @@ codegen CompilerOptions{..} modl exprs = do
         >=> bool return jit optReplMode
   --process = printAsm >=> optimize >=> jit
 
-  deltaModl = delPrevMain >> codegenTop exprs
+  deltaModl = delPrevMain >> codegenTop nonDefExprs defExprs

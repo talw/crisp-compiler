@@ -72,12 +72,14 @@ primFuncs =
   ,("vector-set!", "vectorSet")
   ]
 
-envVarName, suffLambda, dataPrefix, vectorPrefix, entryFuncName :: String
+envVarName, suffLambda, dataPrefix, vectorPrefix :: String
+entryFuncName, initGlobalsFuncName :: String
 suffLambda = "-lambda"
 envVarName = "__env"
 dataPrefix = "'"
 vectorPrefix = "#"
 entryFuncName = "entryFunc"
+initGlobalsFuncName = "initGlobals"
 
 data Expr
   = NumberExp Integer

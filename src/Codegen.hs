@@ -43,7 +43,7 @@ emptyModule label = defaultModule { moduleName = label }
 addDefn :: Definition -> LLVM ()
 addDefn d = do
   defs <- gets moduleDefinitions
-  modify $ \s -> s { moduleDefinitions = defs ++ [d] }
+  modify $ \s -> s { moduleDefinitions = nub $ defs ++ [d] }
 
 defineGlobalVar :: String -> LLVM ()
 defineGlobalVar varName = addDefn $
@@ -144,6 +144,10 @@ sortBlocks = sortBy (compare `on` (idx . snd))
 createBlocks :: CodegenState -> [BasicBlock]
 createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
 
+mergeBlocks :: BasicBlock -> BasicBlock -> BasicBlock
+mergeBlocks (BasicBlock _ srcInstrs _) (BasicBlock name targetInstrs term) =
+  BasicBlock name (targetInstrs ++ srcInstrs) term
+
 makeBlock :: (Name, BlockState) -> BasicBlock
 makeBlock (l, BlockState _ s t) = BasicBlock l s (maketerm t)
   where
@@ -161,9 +165,10 @@ emptyCodegen fname =
   CodegenState
     (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty [] fname []
 
-execCodegen :: SymName -> Codegen a -> CodegenState
-execCodegen fname computation =
-  execState (runCodegen computation) $ emptyCodegen fname
+execCodegen :: SymName -> [SymName] -> Codegen a -> CodegenState
+execCodegen fname globalVars computation =
+  execState (runCodegen computation) $
+    (emptyCodegen fname) { globalVars = globalVars }
 
 fresh :: Codegen Word
 fresh = do

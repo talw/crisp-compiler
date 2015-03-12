@@ -5,6 +5,7 @@ module Main where
 import Parser
 import Emit
 import Options
+import Syntax
 
 import System.Console.Haskeline
 import System.Environment (getArgs)
@@ -15,11 +16,16 @@ import Data.Maybe (fromJust)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT(..))
 
-processFile :: CompilerOptions -> AST.Module -> ExceptT String IO AST.Module
+data CrispModule = CrispModule
+  { astModule :: AST.Module
+  , defExprs :: [Expr]
+  }
+
+processFile :: CompilerOptions -> CrispModule -> ExceptT String IO CrispModule
 processFile opts@CompilerOptions{..} initMod = ExceptT $
   readFile optInputFilePath >>= process opts initMod
 
-repl :: CompilerOptions -> AST.Module -> IO ()
+repl :: CompilerOptions -> CrispModule -> IO ()
 repl opts@(CompilerOptions {..}) initMod =
   runInputT defaultSettings . loop $ initMod
  where loop modl = do
@@ -34,16 +40,21 @@ repl opts@(CompilerOptions {..}) initMod =
                  outputStrLn err
                  loop modl
 
-process :: CompilerOptions -> AST.Module -> String
-        -> IO (Either String AST.Module)
-process opts@CompilerOptions{..} modl source = do
-  let res = parseExpr source
-  case res of
+process :: CompilerOptions -> CrispModule -> String
+        -> IO (Either String CrispModule)
+process opts@CompilerOptions{..} modl source =
+  case parseExpr source of
     Left err -> return . Left $ show err
     Right exprs -> do
       print exprs
-      modl' <- codegen opts modl exprs
-      return . Right $ modl'
+      let defExprs'    = filter isDefinition exprs ++ defExprs modl
+          nonDefExprs = filter (not . isDefinition) exprs
+      updatedAstMod <- codegen opts (astModule modl) nonDefExprs defExprs'
+      return . Right $ CrispModule updatedAstMod defExprs'
+ where
+  isDefinition (DefExp {}) = True
+  isDefinition _ = False
+
 
 main :: IO ()
 main = do
@@ -57,14 +68,16 @@ main = do
     --[]      -> emodAction False repl
     --ifn : ofn : _ -> emodAction True $ compile optInputFilePath optOutputFilePath
  where
-  emodAction isRepl action =
-    either putStrLn action =<< initModule (not isRepl) "default module"
+  emodAction isRepl action = do
+    eAstMod <- initModule (not isRepl) "default module"
+    let eCrispMod = eAstMod >>= \astMod -> return $ CrispModule astMod []
+    either putStrLn action eCrispMod
 
-compile :: CompilerOptions -> AST.Module -> IO ()
-compile opts@CompilerOptions{..} astMod = do
-  eRes <- runExceptT $
-    processFile opts astMod
-    >>= writeTargetCode opts
+compile :: CompilerOptions -> CrispModule -> IO ()
+compile opts@CompilerOptions{..} modl = do
+  eRes <- runExceptT $ do
+    modl' <- processFile opts modl
+    writeTargetCode opts $ astModule modl'
   case eRes of
     Left err -> putStrLn err
     Right () -> putStrLn "Compiled successfully."
