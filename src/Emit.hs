@@ -38,48 +38,37 @@ import qualified Codegen as CG
 import Syntax
 import JIT
 import Options
-import Immediates hiding (false, true)
-import qualified Immediates as IM
+import Immediates
 
 import Paths_lc_hs (getDataDir)
 import System.FilePath ((</>))
 import Text.Printf (printf)
 import Utils (readBinary)
 
-argsTypeList :: Int -> [AST.Type]
-argsTypeList n = replicate n uint
+-------------------------------------------------------------------------------
+-- Compilation to LLVM
+-------------------------------------------------------------------------------
 
-false :: AST.Operand
-false = constOpr . C.Int uintSize . fromIntegral $ IM.false
+printLLVMasm :: AST.Module -> ExceptT String IO AST.Module
+printLLVMasm modl = ExceptT $ withContext $ \context ->
+  runExceptT $ withModuleFromAST context modl $ \m -> do
+    putStrLn =<< moduleLLVMAssembly m
+    return modl
 
-toSig :: [String] -> [(AST.Type, AST.Name)]
-toSig = map (\x -> (uint, AST.Name x))
-
-setElemPtr :: AST.Operand -> Int -> AST.Operand -> Codegen AST.Operand
-setElemPtr struct ix item =
-  getelementptr struct ix >>= flip store item
-
-getFuncDefinition :: SymName -> [AST.Definition] -> Maybe AST.Definition
-getFuncDefinition searchedName modDefs =
-  listToMaybe . filter filt $ modDefs
+codegen :: CompilerOptions -> AST.Module -> [Expr] -> [Expr] -> IO AST.Module
+codegen CompilerOptions{..} modl nonDefExprs defExprs = do
+  res <- runExceptT $ process preOptiAst
+  case res of
+    Right newAst -> return newAst
+    Left err     -> putStrLn err >> return preOptiAst
  where
-  filt
-    (AST.GlobalDefinition
-      (AST.Function { G.name = AST.Name funcName, .. }))
-    | funcName == searchedName = True
-  filt _ = False
+  preOptiAst = runLLVM modl deltaModl
+  process = bool return printLLVMasm optPrintLLVM
+        >=> optimize
+        >=> bool return jit optReplMode
 
-delPrevMain :: LLVM ()
-delPrevMain = delFuncDef entryFuncName
-
-delFuncDef :: String -> LLVM ()
-delFuncDef fname = do
-  mFuncDef <- gets $ getFuncDefinition fname . moduleDefinitions
-  maybe (return ()) del mFuncDef
- where
-  del funcDef =
-    modify $ \mod ->
-      mod { AST.moduleDefinitions = delete funcDef $ moduleDefinitions mod }
+  deltaModl = delPrevMain >> codegenTop nonDefExprs defExprs
+  delPrevMain = delFunc entryFuncName
 
 codegenTop :: [Expr] -> [Expr] -> LLVM ()
 codegenTop nonDefExprs defExprs  = do
@@ -94,7 +83,7 @@ codegenTop nonDefExprs defExprs  = do
   processDefinitons = do
     traverse processDefiniton defExprs
 
-    delFuncDef initGlobalsFuncName
+    delFunc initGlobalsFuncName
     codegenFunction initGlobalsFuncName [] (return ()) [] globalVars defExprs
    where
     processDefiniton (DefExp name expr) =
@@ -123,7 +112,7 @@ codegenFunction funcName argTys prologue args globalVars exprs = do
     ret res
 
   cgenComputation = do
-    resList <- traverse cgen exprs
+    resList <- traverse codegenExpr exprs
     return $ if null resList
                then constUint nilValue
                else last resList
@@ -139,56 +128,18 @@ codegenExterns =
                            ,(AST.IntegerType 64, AST.Name "size") ]
 
 -------------------------------------------------------------------------------
--- Operations
--------------------------------------------------------------------------------
-
-memalignRaw :: Int -> Codegen AST.Operand
-memalignRaw  sizeInBytes =
-  call (funcOpr uint (AST.Name "memalign") $ replicate 2 $ AST.IntegerType 64)
-    $ map (constUintSize 64) [1, sizeInBytes]
-
-memalign :: Int -> Codegen AST.Operand
-memalign sizeInWords = memalignRaw $ sizeInWords * uintSizeBytes
-
-comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
-comp ip a b = do
-  res        <- zext uint =<< icmp ip a b
-  resShifted <- shl res . constUint $ shiftWidthOfFormat boolFormat
-  CG.or resShifted . constUint $ formatMasked boolFormat
-
-binArithOp :: (AST.Operand -> AST.Operand -> Codegen AST.Operand)
-           -> AST.Operand -> AST.Operand -> Codegen AST.Operand
-binArithOp op a b = do
-  a' <- shr a . constUint $ shiftWidthOfFormat fixnumFormat
-  b' <- shr b . constUint $ shiftWidthOfFormat fixnumFormat
-  res <- op a' b'
-  resShifted <- shl res . constUint $ shiftWidthOfFormat fixnumFormat
-  CG.or resShifted . constUint $ formatMasked fixnumFormat
-
-asIRbinOp :: BinOp -> AST.Operand -> AST.Operand -> Codegen AST.Operand
-asIRbinOp Add = binArithOp iadd
-asIRbinOp Sub = binArithOp isub
-asIRbinOp Mul = binArithOp imul
-asIRbinOp Div = binArithOp idiv
-asIRbinOp Lt  = comp IP.ULT
-asIRbinOp Lte  = comp IP.ULE
-asIRbinOp Gt   = comp IP.UGT
-asIRbinOp Gte  = comp IP.UGE
-asIRbinOp Eq   = comp IP.EQ
-
--------------------------------------------------------------------------------
 -- Translation of Expr values into llvm IR
 -------------------------------------------------------------------------------
 
-cgen :: Expr -> Codegen AST.Operand
+codegenExpr :: Expr -> Codegen AST.Operand
 
-cgen (BoolExp True) = return . constUint $ IM.true
-cgen (BoolExp False) = return . constUint $ IM.false
-cgen (NumberExp n) = return . constUint . toFixnum $ n
-cgen (CharExp c) = return . constUint . toChar $ c
-cgen EmptyExp = return . constUint $ nilValue
+codegenExpr (BoolExp True) = return . constUint $ trueValue
+codegenExpr (BoolExp False) = return . constUint $ falseValue
+codegenExpr (NumberExp n) = return . constUint . toFixnum $ n
+codegenExpr (CharExp c) = return . constUint . toChar $ c
+codegenExpr EmptyExp = return . constUint $ nilValue
 
-cgen (StringExp str) = do
+codegenExpr (StringExp str) = do
   vecPtr <- memalignRaw $ uintSizeBytes + strLen
   vecPtrC <- inttoptr vecPtr $ ptr uint
   store vecPtrC $ constUint strLen
@@ -204,13 +155,13 @@ cgen (StringExp str) = do
  where
   strLen = length str
 
-cgen (ArrayExp exprs) = do
+codegenExpr (ArrayExp exprs) = do
   vecPtr <- memalign $ exprCount + 1
   vecPtrC <- inttoptr vecPtr $ ptr uint
   store vecPtrC $ constUint exprCount
 
   for (zip [1..] exprs) $ \(i, expr) -> do
-    opr <- cgen expr
+    opr <- codegenExpr expr
     targetPtr <- getelementptrRaw vecPtrC [i]
     store targetPtr opr
 
@@ -218,33 +169,33 @@ cgen (ArrayExp exprs) = do
  where
   exprCount = length exprs
 
-cgen (BinOpExp op a b) = do
-  ca <- cgen a
-  cb <- cgen b
+codegenExpr (BinOpExp op a b) = do
+  ca <- codegenExpr a
+  cb <- codegenExpr b
   asIRbinOp op ca cb
 
-cgen (VarExp varName) =
+codegenExpr (VarExp varName) =
   maybe planB load =<< getvar varName
  where
   planB = load $ extern (AST.Name varName)
 
-cgen (DefExp defName expr) = do
+codegenExpr (DefExp defName expr) = do
   gvs <- gets globalVars
   modify $ \s -> s { globalVars = defName : gvs }
-  cgen (SetExp defName expr)
+  codegenExpr (SetExp defName expr)
 
-cgen (SetExp symName expr) = do
+codegenExpr (SetExp symName expr) = do
   mVarPtr <- getvar symName
   let ptr = fromMaybe (extern $ AST.Name symName) mVarPtr
-  store ptr =<< cgen expr
+  store ptr =<< codegenExpr expr
   return $ constUint nilValue
 
-cgen (PrimCallExp primName args) = do
-  operands <- traverse cgen args
+codegenExpr (PrimCallExp primName args) = do
+  operands <- traverse codegenExpr args
   call (extern $ AST.Name primName) operands
 
-cgen (CallExp func args) = do
-  funcEnvPtr <- cgen func
+codegenExpr (CallExp func args) = do
+  funcEnvPtr <- codegenExpr func
   funcEnvPtrC <- inttoptr funcEnvPtr $ ptr $ structType [uint, uint]
   envPtrPtr <- getelementptr funcEnvPtrC 0
   envPtr <- load envPtrPtr
@@ -253,10 +204,10 @@ cgen (CallExp func args) = do
   funcPtrC <- inttoptr funcPtr $
      ptr $ AST.FunctionType uint (argsTypeList $ length args + 1) False
 
-  operands <- traverse cgen args
+  operands <- traverse codegenExpr args
   call funcPtrC $ envPtr : operands
 
-cgen fe@(FuncExp vars body) = do
+codegenExpr fe@(FuncExp vars body) = do
   cgst <- get
 
   let
@@ -317,13 +268,13 @@ cgen fe@(FuncExp vars body) = do
 
   return returnedOpr
 
-cgen (IfExp cond tr fl) = do
+codegenExpr (IfExp cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
   ifexit <- addBlock "if.exit"
 
-  cond <- cgen cond
-  test <- icmp IP.NE false cond
+  cond <- codegenExpr cond
+  test <- icmp IP.NE falseOpr cond
   cbr test ifthen ifelse -- Branch based on the condition
 
   (trval, ifthen) <- thenBr ifthen ifexit
@@ -332,20 +283,21 @@ cgen (IfExp cond tr fl) = do
   setBlock ifexit
   phi uint [(trval, ifthen), (flval, ifelse)]
  where
+  falseOpr = constUint falseValue
   thenBr ifthen ifexit = do
     setBlock ifthen
-    trval <- cgen tr
+    trval <- codegenExpr tr
     br ifexit
     ifthen <- getBlock
     return (trval, ifthen)
   elseBr ifelse ifexit = do
     setBlock ifelse
-    flval <- cgen fl
+    flval <- codegenExpr fl
     br ifexit
     ifelse <- getBlock
     return (flval, ifelse)
 
-cgen _ = error "cgen called with unexpected Expr"
+codegenExpr _ = error "codegenExpr called with unexpected Expr"
 
 -------------------------------------------------------------------------------
 -- Composite Types
@@ -362,24 +314,46 @@ envStructType freeVars =
   AST.StructureType True . argsTypeList $ length freeVars
 
 -------------------------------------------------------------------------------
--- Compilation
+-- Operations
 -------------------------------------------------------------------------------
 
-initModule :: Bool -> String -> IO (Either String AST.Module)
-initModule linkDriver label = withContext $ \context -> do
-  dataDir <- getDataDir
-  let primModFilePath = File $ dataDir </> "c-src/primitives.ll"
-      driverModFilePath = File $ dataDir </> "c-src/driver.ll"
-      constsModFilePath = File $ dataDir </> "c-src/constants.ll"
-  runExceptT $
-    linkModule primModFilePath
-    >=> linkModule constsModFilePath
-    >=> (if linkDriver then linkModule driverModFilePath else return)
-    $ initialModAST
- where
-  initialModAST = runLLVM
-                    (AST.defaultModule { AST.moduleName = label })
-                    codegenExterns
+memalignRaw :: Int -> Codegen AST.Operand
+memalignRaw  sizeInBytes =
+  call (funcOpr uint (AST.Name "memalign") $ replicate 2 $ AST.IntegerType 64)
+    $ map (constUintSize 64) [1, sizeInBytes]
+
+memalign :: Int -> Codegen AST.Operand
+memalign sizeInWords = memalignRaw $ sizeInWords * uintSizeBytes
+
+comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
+comp ip a b = do
+  res        <- zext uint =<< icmp ip a b
+  resShifted <- shl res . constUint $ shiftWidthOfFormat boolFormat
+  CG.or resShifted . constUint $ formatMasked boolFormat
+
+binArithOp :: (AST.Operand -> AST.Operand -> Codegen AST.Operand)
+           -> AST.Operand -> AST.Operand -> Codegen AST.Operand
+binArithOp op a b = do
+  a' <- shr a . constUint $ shiftWidthOfFormat fixnumFormat
+  b' <- shr b . constUint $ shiftWidthOfFormat fixnumFormat
+  res <- op a' b'
+  resShifted <- shl res . constUint $ shiftWidthOfFormat fixnumFormat
+  CG.or resShifted . constUint $ formatMasked fixnumFormat
+
+asIRbinOp :: BinOp -> AST.Operand -> AST.Operand -> Codegen AST.Operand
+asIRbinOp Add = binArithOp iadd
+asIRbinOp Sub = binArithOp isub
+asIRbinOp Mul = binArithOp imul
+asIRbinOp Div = binArithOp idiv
+asIRbinOp Lt  = comp IP.ULT
+asIRbinOp Lte  = comp IP.ULE
+asIRbinOp Gt   = comp IP.UGT
+asIRbinOp Gte  = comp IP.UGE
+asIRbinOp Eq   = comp IP.EQ
+
+-------------------------------------------------------------------------------
+-- Linking LLVM modules
+-------------------------------------------------------------------------------
 
 linkModule :: File -> AST.Module -> ExceptT String IO AST.Module
 linkModule fp modlAST = ExceptT $ withContext $ \context -> do
@@ -389,6 +363,10 @@ linkModule fp modlAST = ExceptT $ withContext $ \context -> do
         linkModules False modl modToLink
         liftIO $ moduleAST modl
   return $ either (Left . show) id result
+
+-------------------------------------------------------------------------------
+-- Compilation to machine code
+-------------------------------------------------------------------------------
 
 writeTargetCode :: CompilerOptions
                 -> AST.Module -> ExceptT String IO ()
@@ -404,23 +382,39 @@ writeTargetCode CompilerOptions{..} astMod = do
         fmap join . runExceptT . withDefaultTargetMachine $ \target ->
           runExceptT $ writeObjectToFile target (File objfn) mod
 
+-------------------------------------------------------------------------------
+-- Initial AST module
+-------------------------------------------------------------------------------
 
-printAsm :: AST.Module -> ExceptT String IO AST.Module
-printAsm modl = ExceptT $ withContext $ \context ->
-  runExceptT $ withModuleFromAST context modl $ \m -> do
-    putStrLn =<< moduleLLVMAssembly m
-    return modl
-
-codegen :: CompilerOptions -> AST.Module -> [Expr] -> [Expr] -> IO AST.Module
-codegen CompilerOptions{..} modl nonDefExprs defExprs = do
-  res <- runExceptT $ process preOptiAst
-  case res of
-    Right newAst -> return newAst
-    Left err     -> putStrLn err >> return preOptiAst
+-- | The initial module comes with external declarations, and is linked
+-- with primitive functions and constants defined in C.
+-- If it is used for compilation
+-- (and not for the initial module of a REPL session) the C driver is
+-- linked as well.
+initModule :: Bool -> String -> IO (Either String AST.Module)
+initModule linkDriver label = withContext $ \context -> do
+  dataDir <- getDataDir
+  let primModFilePath = File $ dataDir </> "c-src/primitives.ll"
+      driverModFilePath = File $ dataDir </> "c-src/driver.ll"
+      constsModFilePath = File $ dataDir </> "c-src/constants.ll"
+  runExceptT $
+    linkModule primModFilePath
+    >=> linkModule constsModFilePath
+    >=> (if linkDriver then linkModule driverModFilePath else return)
+    $ initialASTmod
  where
-  preOptiAst = runLLVM modl deltaModl
-  process = bool return printAsm optPrintLLVM
-        >=> optimize
-        >=> bool return jit optReplMode
+  initialASTmod = runLLVM
+                    (AST.defaultModule { AST.moduleName = label })
+                    codegenExterns
 
-  deltaModl = delPrevMain >> codegenTop nonDefExprs defExprs
+-------------------------------------------------------------------------------
+-- Helper functions for emitting
+-------------------------------------------------------------------------------
+
+argsTypeList :: Int -> [AST.Type]
+argsTypeList n = replicate n uint
+
+setElemPtr :: AST.Operand -> Int -> AST.Operand -> Codegen AST.Operand
+setElemPtr struct ix item =
+  getelementptr struct ix >>= flip store item
+

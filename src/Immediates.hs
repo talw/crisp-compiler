@@ -44,9 +44,9 @@ toChar = (.|. formatMasked charFormat)
   . flip shift (shiftWidthOfFormat charFormat)
   . fromIntegral . ord
 
-true, false :: Word32
-true = readBinary $ tr "*" "1" boolFormat
-false = readBinary $ tr "*" "0" boolFormat
+trueValue, falseValue :: Word32
+trueValue = readBinary $ tr "*" "1" boolFormat
+falseValue = readBinary $ tr "*" "0" boolFormat
 
 showImmediate :: Word32 -> String
 showImmediate n =

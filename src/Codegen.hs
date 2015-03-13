@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Codegen where
 
@@ -8,6 +9,7 @@ import Data.List
 import Data.Function
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (listToMaybe)
 
 import Control.Monad.State
 import Control.Monad.Trans.Maybe (MaybeT(..))
@@ -61,6 +63,26 @@ defineFunc retty label argtys body = addDefn $
   , returnType  = retty
   , basicBlocks = body
   }
+
+delFunc :: String -> LLVM ()
+delFunc fname = do
+  mFuncDef <- gets $ getFuncDefinition fname . moduleDefinitions
+  maybe (return ()) del mFuncDef
+ where
+  del funcDef =
+    modify $ \mod ->
+      mod { AST.moduleDefinitions = delete funcDef $ moduleDefinitions mod }
+
+getFuncDefinition :: SymName -> [AST.Definition] -> Maybe AST.Definition
+getFuncDefinition searchedName modDefs =
+  listToMaybe . filter filt $ modDefs
+ where
+  filt
+    (AST.GlobalDefinition
+      (AST.Function { G.name = AST.Name funcName, .. }))
+    | funcName == searchedName = True
+  filt _ = False
+
 
 defineType :: String -> Type -> LLVM ()
 defineType name ty = addDefn . TypeDefinition (Name name) . Just $ ty
