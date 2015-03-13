@@ -80,24 +80,12 @@ delFuncDef fname = do
   del funcDef =
     modify $ \mod ->
       mod { AST.moduleDefinitions = delete funcDef $ moduleDefinitions mod }
-  --modify $ \s -> s { AST.moduleDefinitions = filter filt md }
- --where
-  --filt (AST.GlobalDefinition
-    --(AST.Function { G.name = AST.Name funcName, .. }))
-     -- | funcName == entryFuncName = False
-  --filt _ = True
 
 codegenTop :: [Expr] -> [Expr] -> LLVM ()
 codegenTop nonDefExprs defExprs  = do
-  --traverse processDefiniton $ definitions
-  --processExpressions2 definitions
   processDefinitons
   processExpressions
-  {-processExpressions $ filter needsExpressing exprs-}
  where
-  {-isDefinition (DefExp {}) = True-}
-  {-isDefinition _ = False-}
-
   globalVars = flip map defExprs $ \(DefExp name _) -> name
   processExpressions =
     codegenFunction entryFuncName [] bodyPrelude [] globalVars nonDefExprs
@@ -109,30 +97,8 @@ codegenTop nonDefExprs defExprs  = do
     delFuncDef initGlobalsFuncName
     codegenFunction initGlobalsFuncName [] (return ()) [] globalVars defExprs
    where
-    {-definitions = filter isDefinition exprs-}
     processDefiniton (DefExp name expr) =
       codegenGlobalVar name
-
-  {-processExpressions2 exprs = do-}
-    {-modDefs <- gets moduleDefinitions-}
-    {-case getFuncDefinition initGlobalsFuncName modDefs of-}
-      {-Nothing -> genFunc initGlobalsFuncName [] [] exprs-}
-
-      {-Just (AST.GlobalDefinition prevDef@G.Function{..}) ->-}
-        {-let-}
-          {-prevEntryBlock = head basicBlocks-}
-          {-entryBlockDelta =-}
-            {-head . createBlocks . execCodegen initGlobalsFuncName $ do-}
-              {-addBlock entryBlockName-}
-              {-traverse cgen exprs-}
-          {-newEntryBlock = mergeBlocks entryBlockDelta prevEntryBlock-}
-          {-basicBlocks' = newEntryBlock : tail basicBlocks-}
-          {-newDef = AST.GlobalDefinition prevDef { G.basicBlocks = basicBlocks' }-}
-        {-in-}
-          {-do-}
-            {-delFuncDef initGlobalsFuncName-}
-            {-modify $-}
-              {-\mod -> mod { moduleDefinitions = newDef : moduleDefinitions mod }-}
 
 codegenGlobalVar :: SymName -> LLVM()
 codegenGlobalVar = defineGlobalVar
@@ -169,18 +135,12 @@ codegenType = defineType
 
 codegenExterns :: LLVM ()
 codegenExterns =
-  --external uint "malloc"   [(AST.IntegerType 64, AST.Name "size")]
   external uint "memalign" [(AST.IntegerType 64, AST.Name "alignment")
                            ,(AST.IntegerType 64, AST.Name "size") ]
 
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
-
---malloc :: Int -> Codegen AST.Operand
---malloc size =
-  --call (funcOpr uint (AST.Name "malloc") [AST.IntegerType 64])
-              --[constUintSize 64 $ uintSizeBytes * size]
 
 memalignRaw :: Int -> Codegen AST.Operand
 memalignRaw  sizeInBytes =
@@ -189,8 +149,6 @@ memalignRaw  sizeInBytes =
 
 memalign :: Int -> Codegen AST.Operand
 memalign sizeInWords = memalignRaw $ sizeInWords * uintSizeBytes
-  {-call (funcOpr uint (AST.Name "memalign") $ replicate 2 $ AST.IntegerType 64)-}
-    {-$ map (constUintSize 64) [1, uintSizeBytes * size]-}
 
 comp :: IP.IntegerPredicate -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 comp ip a b = do
@@ -388,7 +346,6 @@ cgen (IfExp cond tr fl) = do
     return (flval, ifelse)
 
 cgen _ = error "cgen called with unexpected Expr"
---cgen (S.UnaryOp op a) = cgen $ S.Call ("unary" ++ op) [a]
 
 -------------------------------------------------------------------------------
 -- Composite Types
@@ -465,6 +422,5 @@ codegen CompilerOptions{..} modl nonDefExprs defExprs = do
   process = bool return printAsm optPrintLLVM
         >=> optimize
         >=> bool return jit optReplMode
-  --process = printAsm >=> optimize >=> jit
 
   deltaModl = delPrevMain >> codegenTop nonDefExprs defExprs

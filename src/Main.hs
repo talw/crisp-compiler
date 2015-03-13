@@ -64,9 +64,6 @@ main = do
     if optReplMode
       then repl opts
       else compile opts
-  --case args of
-    --[]      -> emodAction False repl
-    --ifn : ofn : _ -> emodAction True $ compile optInputFilePath optOutputFilePath
  where
   emodAction isRepl action = do
     eAstMod <- initModule (not isRepl) "default module"
