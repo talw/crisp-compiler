@@ -48,7 +48,7 @@ process opts@CompilerOptions{..} modl source =
   case parseExpr source of
     Left err -> return . Left $ show err
     Right exprs -> do
-      print exprs
+      {-print exprs-}
       let defExprs'    = filter isDefinition exprs ++ defExprs modl
           nonDefExprs = filter (not . isDefinition) exprs
       updatedAstMod <- codegen opts (astModule modl) nonDefExprs defExprs'

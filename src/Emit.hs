@@ -372,8 +372,9 @@ writeTargetCode :: CompilerOptions
                 -> AST.Module -> ExceptT String IO ()
 writeTargetCode CompilerOptions{..} astMod = do
   writeObjFile
-  void . liftIO . createProcess $
-    proc "gcc" ["-lm", objfn, "-o", optOutputFilePath]
+  {-void . liftIO . createProcess $-}
+    {-proc "gcc" ["-lm", objfn, "-o", optOutputFilePath]-}
+  liftIO $ callProcess "gcc" ["-lm", objfn, "-o", optOutputFilePath]
  where
   objfn = optInputFilePath ++ ".o"
   writeObjFile = ExceptT $
