@@ -1,6 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Main where
+module CrispMain
+  ( main
+  ) where
 
 import Parser
 import Emit
