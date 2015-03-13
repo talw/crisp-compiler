@@ -395,9 +395,10 @@ writeTargetCode CompilerOptions{..} astMod = do
 initModule :: Bool -> String -> IO (Either String AST.Module)
 initModule linkDriver label = withContext $ \context -> do
   dataDir <- getDataDir
-  let primModFilePath = File $ dataDir </> "c-src/primitives.ll"
-      driverModFilePath = File $ dataDir </> "c-src/driver.ll"
-      constsModFilePath = File $ dataDir </> "c-src/constants.ll"
+  let preCompModDir = dataDir </> "precompiled-modules"
+      primModFilePath = File $ preCompModDir </> "primitives.ll"
+      driverModFilePath = File $ preCompModDir </> "driver.ll"
+      constsModFilePath = File $ preCompModDir </> "constants.ll"
   runExceptT $
     linkModule primModFilePath
     >=> linkModule constsModFilePath

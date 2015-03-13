@@ -15,9 +15,8 @@ build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
 
-data-files:          c-src/primitives.ll
-                     c-src/driver.ll
-                     c-src/constants.ll
+data-dir:            resources
+data-files:          precompiled-modules/*.ll
                      tests/*.scm
                      tests/*.ans
 
@@ -64,7 +63,7 @@ executable crc
 
 test-suite lc-hs-tests
   type:                exitcode-stdio-1.0
-  hs-source-dirs:      tests
+  hs-source-dirs:      src-test
   main-is:             Tests.hs
   build-depends:       base >=4.7 && <4.8
                      , HUnit ==1.2.*
