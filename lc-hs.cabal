@@ -47,11 +47,11 @@ library
                      , filepath ==1.3.*
                      , process ==1.2.*
                      , HUnit ==1.2.*
+                     , transformers
                      , directory
                      , strict
   default-language:    Haskell2010
   GHC-Options:         -Wall
-  other-extensions:    OverloadedStrings, GeneralizedNewtypeDeriving
 
 executable crc
   main-is:             Main.hs

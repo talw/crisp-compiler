@@ -145,8 +145,12 @@ contentsP p = do
   eof
   return r
 
-parseExpr :: String -> Either ParseError [Expr]
-parseExpr s = parse (contentsP toplevel) "<stdin>" s
+parseExpr :: String -> Either String [Expr]
+parseExpr s = mapError show $ parse (contentsP toplevel) "<stdin>" s
+  where
+   mapError f (Left e) = Left $ f e
+   mapError _ (Right r) = Right r -- Right ctor of Either ParseError x
+                                  -- vs Right ctor of Either String x
 
 toplevel :: Parser [Expr]
 toplevel = many exprP

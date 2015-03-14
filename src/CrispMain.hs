@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverlappingInstances #-}
 
 module CrispMain
   ( main
@@ -15,69 +16,77 @@ import System.Environment (getArgs)
 import qualified LLVM.General.AST as AST
 import Data.Functor (void)
 import Data.Maybe (fromJust)
+import Control.Applicative (Applicative)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Except (ExceptT(..))
+import Control.Monad.Trans.Except (ExceptT(..), throwE)
+import Control.Monad.Trans (MonadTrans(..), MonadIO)
+import Control.Monad.Trans.Error (ErrorT(..))
+import Control.Monad.Error.Class (throwError, catchError)
+import Control.Monad.State (get, put)
+import Control.Monad.State.Strict (StateT(..), MonadState)
+import Control.Monad.Reader (ReaderT(..), MonadReader, ask)
 
-data CrispModule = CrispModule
-  { astModule :: AST.Module
-  , defExprs :: [Expr]
-  }
+emptyModule :: CrispModule
+emptyModule = CrispModule AST.defaultModule []
 
-processFile :: CompilerOptions -> CrispModule -> ExceptT String IO CrispModule
-processFile opts@CompilerOptions{..} initMod = ExceptT $
-  readFile optInputFilePath >>= process opts initMod
+runCrispComputation :: CrispComputation a -> CompilerOptions -> CrispModule
+  -> IO (Either String (a, CrispModule))
+runCrispComputation cc opts crispMod =
+  runErrorT (runStateT (runReaderT cc opts) crispMod)
 
-repl :: CompilerOptions -> CrispModule -> IO ()
-repl opts@(CompilerOptions {..}) initMod =
-  runInputT defaultSettings . loop $ initMod
- where loop modl = do
-         minput <- getInputLine "ready> "
-         case minput of
-           Nothing -> outputStrLn "Goodbye."
-           Just input -> do
-             mmodl' <- liftIO $ process opts modl input
-             case mmodl' of
-               Right modl' -> loop modl'
-               Left err -> do
-                 outputStrLn err
-                 loop modl
+processFile :: CrispComputation ()
+processFile = do
+  CompilerOptions{..} <- ask
+  liftIO (readFile optInputFilePath) >>= process
 
-process :: CompilerOptions -> CrispModule -> String
-        -> IO (Either String CrispModule)
-process opts@CompilerOptions{..} modl source =
-  case parseExpr source of
-    Left err -> return . Left $ show err
-    Right exprs -> do
-      {-print exprs-}
-      let defExprs'    = filter isDefinition exprs ++ defExprs modl
-          nonDefExprs = filter (not . isDefinition) exprs
-      updatedAstMod <- codegen opts (astModule modl) nonDefExprs defExprs'
-      return . Right $ CrispModule updatedAstMod defExprs'
+repl :: CrispComputation ()
+repl = do
+  opts <- ask
+  runInputT defaultSettings loop
+ where
+  loop = do
+    modl <- lift get
+    minput <- getInputLine "ready> "
+    case minput of
+      Nothing -> outputStrLn "Goodbye."
+      Just input -> do
+        lift $ catchError
+          (process input)
+          (liftIO . putStrLn)
+        loop
+
+process :: String -> CrispComputation ()
+process source = do
+  opts <- ask
+  modl <- get
+
+  exprs <- parseComputation
+  let defExprs'    = filter isDefinition exprs ++ defExprs modl
+      nonDefExprs = filter (not . isDefinition) exprs
+
+  updatedAstMod <- liftIO $ codegen opts (astModule modl) nonDefExprs defExprs'
+  put $ CrispModule updatedAstMod defExprs'
  where
   isDefinition (DefExp {}) = True
   isDefinition _ = False
-
+  parseComputation = lift . lift . ErrorT . return $ parseExpr source
 
 main :: IO ()
 main = do
   args <- getArgs
   opts@CompilerOptions{..} <- getOptions args
-  emodAction optReplMode $
-    if optReplMode
-      then repl opts
-      else compile opts
+
+  either putStrLn (const $ return ()) =<< runCrispComputation cc opts emptyModule
  where
-  emodAction isRepl action = do
-    eAstMod <- initModule (not isRepl) "default module"
-    let eCrispMod = eAstMod >>= \astMod -> return $ CrispModule astMod []
-    either putStrLn action eCrispMod
+  cc = do
+    CompilerOptions{..} <- ask
+    initModule (not optReplMode) "default module"
+    if optReplMode
+      then repl
+      else compile
 
-compile :: CompilerOptions -> CrispModule -> IO ()
-compile opts@CompilerOptions{..} modl = do
-  eRes <- runExceptT $ do
-    modl' <- processFile opts modl
-    writeTargetCode opts $ astModule modl'
-  case eRes of
-    Left err -> putStrLn err
-    Right () -> putStrLn "Compiled successfully."
-
+compile :: CrispComputation ()
+compile = do
+  processFile
+  writeTargetCode
+  liftIO $ putStrLn "Compiled successfully."

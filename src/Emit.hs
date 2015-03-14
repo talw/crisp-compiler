@@ -27,10 +27,14 @@ import Data.Char (ord)
 import Data.Bool (bool)
 import Control.Applicative ((<|>))
 import Control.Monad.Trans.Except
+import Control.Monad.Trans (lift)
 import Control.Monad
-import Control.Monad.State (modify, gets, get)
+import Control.Monad.State (modify, gets, get, put)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Maybe (MaybeT(..))
+import Control.Monad.Trans.Error (ErrorT(..))
+import Control.Monad.State.Strict (StateT(..), MonadState)
+import Control.Monad.Reader (ReaderT(..), MonadReader, ask)
 import System.Process
 
 import Codegen
@@ -44,6 +48,13 @@ import Paths_lc_hs (getDataDir)
 import System.FilePath ((</>))
 import Text.Printf (printf)
 import Utils (readBinary)
+
+type CrispComputation a = ReaderT CompilerOptions (StateT CrispModule (ErrorT String IO)) a
+
+data CrispModule = CrispModule
+  { astModule :: AST.Module
+  , defExprs :: [Expr]
+  }
 
 -------------------------------------------------------------------------------
 -- Compilation to LLVM
@@ -355,8 +366,8 @@ asIRbinOp Eq   = comp IP.EQ
 -- Linking LLVM modules
 -------------------------------------------------------------------------------
 
-linkModule :: File -> AST.Module -> ExceptT String IO AST.Module
-linkModule fp modlAST = ExceptT $ withContext $ \context -> do
+linkModule :: File -> AST.Module -> ErrorT String IO AST.Module
+linkModule fp modlAST = ErrorT $ withContext $ \context -> do
   result <- runExceptT . withModuleFromLLVMAssembly context fp $
     \modToLink -> (join <$>) . runExceptT . withModuleFromAST context modlAST $
       \modl -> runExceptT $ do
@@ -368,20 +379,20 @@ linkModule fp modlAST = ExceptT $ withContext $ \context -> do
 -- Compilation to machine code
 -------------------------------------------------------------------------------
 
-writeTargetCode :: CompilerOptions
-                -> AST.Module -> ExceptT String IO ()
-writeTargetCode CompilerOptions{..} astMod = do
-  writeObjFile
-  {-void . liftIO . createProcess $-}
-    {-proc "gcc" ["-lm", objfn, "-o", optOutputFilePath]-}
+writeTargetCode :: CrispComputation ()
+writeTargetCode = do
+  CompilerOptions{..} <- ask
+  let objfn = optInputFilePath ++ ".o"
+  writeObjFile objfn
   liftIO $ callProcess "gcc" ["-lm", objfn, "-o", optOutputFilePath]
  where
-  objfn = optInputFilePath ++ ".o"
-  writeObjFile = ExceptT $
-    withContext $ \context ->
-      fmap join . runExceptT . withModuleFromAST context astMod $ \mod ->
-        fmap join . runExceptT . withDefaultTargetMachine $ \target ->
-          runExceptT $ writeObjectToFile target (File objfn) mod
+  writeObjFile objfn = do
+    astMod <- gets astModule
+    lift . lift . ErrorT $
+      withContext $ \context ->
+        fmap join . runExceptT . withModuleFromAST context astMod $ \mod ->
+          fmap join . runExceptT . withDefaultTargetMachine $ \target ->
+            runExceptT $ writeObjectToFile target (File objfn) mod
 
 -------------------------------------------------------------------------------
 -- Initial AST module
@@ -392,22 +403,24 @@ writeTargetCode CompilerOptions{..} astMod = do
 -- If it is used for compilation
 -- (and not for the initial module of a REPL session) the C driver is
 -- linked as well.
-initModule :: Bool -> String -> IO (Either String AST.Module)
-initModule linkDriver label = withContext $ \context -> do
-  dataDir <- getDataDir
-  let preCompModDir = dataDir </> "precompiled-modules"
-      primModFilePath = File $ preCompModDir </> "primitives.ll"
-      driverModFilePath = File $ preCompModDir </> "driver.ll"
-      constsModFilePath = File $ preCompModDir </> "constants.ll"
-  runExceptT $
-    linkModule primModFilePath
-    >=> linkModule constsModFilePath
-    >=> (if linkDriver then linkModule driverModFilePath else return)
-    $ initialASTmod
+initModule :: Bool -> String -> CrispComputation ()
+initModule linkDriver label = do
+  initialASTmod <- getLinkedASTmod
+  put $ CrispModule initialASTmod []
  where
   initialASTmod = runLLVM
                     (AST.defaultModule { AST.moduleName = label })
                     codegenExterns
+  getLinkedASTmod = lift . lift $ do
+    dataDir <- liftIO getDataDir
+    let preCompModDir = dataDir </> "precompiled-modules"
+        primModFilePath = File $ preCompModDir </> "primitives.ll"
+        driverModFilePath = File $ preCompModDir </> "driver.ll"
+        constsModFilePath = File $ preCompModDir </> "constants.ll"
+    linkModule primModFilePath
+      >=> linkModule constsModFilePath
+      >=> (if linkDriver then linkModule driverModFilePath else return)
+      $ initialASTmod
 
 -------------------------------------------------------------------------------
 -- Helper functions for emitting
