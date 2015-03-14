@@ -51,10 +51,21 @@ import Utils (readBinary)
 
 type CrispComputation a = ReaderT CompilerOptions (StateT CrispModule (ErrorT String IO)) a
 
+runCrispComputation :: CrispComputation a -> CompilerOptions -> CrispModule
+  -> IO (Either String (a, CrispModule))
+runCrispComputation cc opts crispMod =
+  runErrorT (runStateT (runReaderT cc opts) crispMod)
+
+liftErrorT :: ErrorT String IO a -> CrispComputation a
+liftErrorT = lift . lift
+
 data CrispModule = CrispModule
   { astModule :: AST.Module
   , defExprs :: [Expr]
   }
+
+emptyModule :: CrispModule
+emptyModule = CrispModule AST.defaultModule []
 
 -------------------------------------------------------------------------------
 -- Compilation to LLVM
@@ -388,7 +399,7 @@ writeTargetCode = do
  where
   writeObjFile objfn = do
     astMod <- gets astModule
-    lift . lift . ErrorT $
+    liftErrorT . ErrorT $
       withContext $ \context ->
         fmap join . runExceptT . withModuleFromAST context astMod $ \mod ->
           fmap join . runExceptT . withDefaultTargetMachine $ \target ->
@@ -411,7 +422,7 @@ initModule linkDriver label = do
   initialASTmod = runLLVM
                     (AST.defaultModule { AST.moduleName = label })
                     codegenExterns
-  getLinkedASTmod = lift . lift $ do
+  getLinkedASTmod = liftErrorT $ do
     dataDir <- liftIO getDataDir
     let preCompModDir = dataDir </> "precompiled-modules"
         primModFilePath = File $ preCompModDir </> "primitives.ll"

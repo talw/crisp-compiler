@@ -26,18 +26,24 @@ import Control.Monad.State (get, put)
 import Control.Monad.State.Strict (StateT(..), MonadState)
 import Control.Monad.Reader (ReaderT(..), MonadReader, ask)
 
-emptyModule :: CrispModule
-emptyModule = CrispModule AST.defaultModule []
+main :: IO ()
+main = do
+  args <- getArgs
+  opts <- getOptions args
+  either putStrLn (const $ return ()) =<< runCrispComputation cc opts emptyModule
+ where
+  cc = do
+    CompilerOptions{..} <- ask
+    initModule (not optReplMode) "default module"
+    if optReplMode
+      then repl
+      else compile
 
-runCrispComputation :: CrispComputation a -> CompilerOptions -> CrispModule
-  -> IO (Either String (a, CrispModule))
-runCrispComputation cc opts crispMod =
-  runErrorT (runStateT (runReaderT cc opts) crispMod)
-
-processFile :: CrispComputation ()
-processFile = do
-  CompilerOptions{..} <- ask
-  liftIO (readFile optInputFilePath) >>= process
+compile :: CrispComputation ()
+compile = do
+  processFile
+  writeTargetCode
+  liftIO $ putStrLn "Compiled successfully."
 
 repl :: CrispComputation ()
 repl = do
@@ -55,6 +61,11 @@ repl = do
           (liftIO . putStrLn)
         loop
 
+processFile :: CrispComputation ()
+processFile = do
+  CompilerOptions{..} <- ask
+  liftIO (readFile optInputFilePath) >>= process
+
 process :: String -> CrispComputation ()
 process source = do
   opts <- ask
@@ -68,25 +79,6 @@ process source = do
   put $ CrispModule updatedAstMod defExprs'
  where
   isDefinition (DefExp {}) = True
-  isDefinition _ = False
-  parseComputation = lift . lift . ErrorT . return $ parseExpr source
+  isDefinition _           = False
+  parseComputation = liftErrorT . ErrorT . return $ parseExpr source
 
-main :: IO ()
-main = do
-  args <- getArgs
-  opts@CompilerOptions{..} <- getOptions args
-
-  either putStrLn (const $ return ()) =<< runCrispComputation cc opts emptyModule
- where
-  cc = do
-    CompilerOptions{..} <- ask
-    initModule (not optReplMode) "default module"
-    if optReplMode
-      then repl
-      else compile
-
-compile :: CrispComputation ()
-compile = do
-  processFile
-  writeTargetCode
-  liftIO $ putStrLn "Compiled successfully."
