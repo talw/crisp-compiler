@@ -75,8 +75,9 @@ process source = do
   let defExprs'    = filter isDefinition exprs ++ defExprs modl
       nonDefExprs = filter (not . isDefinition) exprs
 
-  updatedAstMod <- liftIO $ codegen opts (astModule modl) nonDefExprs defExprs'
-  put $ CrispModule updatedAstMod defExprs'
+  updatedAstMod <- liftIO $
+    codegen opts (astModule modl) nonDefExprs defExprs'
+  put $ CompilerState updatedAstMod defExprs'
  where
   isDefinition (DefExp {}) = True
   isDefinition _           = False

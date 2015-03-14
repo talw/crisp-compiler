@@ -49,23 +49,23 @@ import System.FilePath ((</>))
 import Text.Printf (printf)
 import Utils (readBinary)
 
-type CrispComputation a = ReaderT CompilerOptions (StateT CrispModule (ErrorT String IO)) a
+type CrispComputation a = ReaderT CompilerOptions (StateT CompilerState (ErrorT String IO)) a
 
-runCrispComputation :: CrispComputation a -> CompilerOptions -> CrispModule
-  -> IO (Either String (a, CrispModule))
+runCrispComputation :: CrispComputation a -> CompilerOptions -> CompilerState
+  -> IO (Either String (a, CompilerState))
 runCrispComputation cc opts crispMod =
   runErrorT (runStateT (runReaderT cc opts) crispMod)
 
 liftErrorT :: ErrorT String IO a -> CrispComputation a
 liftErrorT = lift . lift
 
-data CrispModule = CrispModule
+data CompilerState = CompilerState
   { astModule :: AST.Module
   , defExprs :: [Expr]
   }
 
-emptyModule :: CrispModule
-emptyModule = CrispModule AST.defaultModule []
+emptyModule :: CompilerState
+emptyModule = CompilerState AST.defaultModule []
 
 -------------------------------------------------------------------------------
 -- Compilation to LLVM
@@ -417,7 +417,7 @@ writeTargetCode = do
 initModule :: Bool -> String -> CrispComputation ()
 initModule linkDriver label = do
   initialASTmod <- getLinkedASTmod
-  put $ CrispModule initialASTmod []
+  put $ CompilerState initialASTmod []
  where
   initialASTmod = runLLVM
                     (AST.defaultModule { AST.moduleName = label })
