@@ -1,9 +1,13 @@
 # crisp-compiler
 
-*This isn't a production-grade compiler. It is merely a personal, educational
+This isn't a production-grade compiler. It is merely a personal, educational
 haskell/llvm/compiler/static-vs-dynamic learning exercise.
 As such, I apologize in advance for atrocities such as mostly missing comments
 and/or lack of unit tests (only integration tests were written).
+
+Do not try running this at home on your 32-bit machine!
+The compiler can be targeted towards 64-bit machines only.
+Moreover, it was only tested on a(n Arch) Linux environment.
 
 ## Introduction
 A compiler for Crisp (Lisp/Scheme subset) in Haskell, with an LLVM backend.
