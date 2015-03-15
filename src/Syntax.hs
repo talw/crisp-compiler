@@ -42,6 +42,8 @@ reservedWords =
   ["define"
   ,"lambda"
   ,"if"
+  ,"cond"
+  ,"else"
   ,"and"
   ,"or"
   ,"not"

@@ -73,6 +73,20 @@ ifP :: Parser Expr
 ifP = reservedFuncP "if" $
   liftA3 IfExp exprP exprP exprP
 
+condP :: Parser Expr
+condP = reservedFuncP "cond" $
+  clauseP
+ where
+  clauseP = try clausesLeftP <|> finishedP
+   where
+    finishedP = return EmptyExp
+    clausesLeftP = do
+      partiallyApplied <- LX.parens $ IfExp <$> predicateP <*> exprP
+      partiallyApplied <$> clauseP
+
+    predicateP = (BoolExp True) <$ LX.reserved "else"
+                 <|> exprP
+
 notP :: Parser Expr
 notP = reservedFuncP "not" $ do
   expr <- exprP
@@ -122,6 +136,7 @@ exprP = LX.lexeme . asum . map try $
   , defineP
   , primFuncP
   , ifP
+  , condP
   , notP
   , andP
   , orP

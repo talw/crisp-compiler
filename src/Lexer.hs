@@ -22,6 +22,7 @@ lexer = Tok.makeTokenParser style
                                   ++ map fst str2bool
                                   ++ map fst str2binOp
             , Tok.identStart    = letter <|> oneOf "_#"
+            , Tok.identLetter   = (Tok.identLetter emptyDef) <|> oneOf "-?!"
             }
 
 lexeme        = Tok.lexeme lexer
