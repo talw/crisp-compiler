@@ -14,11 +14,11 @@ A compiler for Crisp (Lisp/Scheme subset) in Haskell, with an LLVM backend.
 
 I initially wanted Crisp to be inspired by Scheme, and branch off it's own
 path. However, due to recent time constraints, and how bringing the compiler to it's
-current state took more time than I anticipated,
+current state took more time than I've anticipated,
 I settled on a subset of Scheme for now.
 
 ## Example
-Here's an example of implementing merge-sort in crisp.
+Here's an example of implementing merge-sort in Crisp.
 ~~~ {.scm}
 (define empty? (lambda(x) (= x '())))
 
@@ -70,7 +70,7 @@ Here's an example of implementing merge-sort in crisp.
 
 Compile and execute:
 ~~~ {.bash}
-$ crc -i merge-sort.scm -o merge-sort
+$ crc -i merge-sort.crs -o merge-sort
 Compiled successfully.
 $ ./merge-sort
 (10 24 34 47 74 87 90)
@@ -174,7 +174,7 @@ The options are:
 ### Option details
 The compiler has 2 modes of operation:
 - File compilation mode (-i, -o)
-    - A crisp file is passed as an input, and an output my be passed as well. (otherwise ./a.out is used)
+    - A Crisp file is passed as an input, and an output my be passed as well. (otherwise ./a.out is used)
     - The file is compiled and a binary file is written in output.
     - The target machine is the one running the compiler.
 - REPL mode (-r)
@@ -190,7 +190,7 @@ of the compilation process, to be sent to stdout.
     definition will not.
 
 ### Requirements
-- The Haskell compiler, GHC is required, as some GHC extensions are
+- The Haskell compiler GHC is required, as some GHC extensions are
 used in the compiler source files.
 - LLVM bindings to version 3.4.1 were used, as that is what was (still is?)
 available at the time of writing the bulk of crc. Make sure it is installed
@@ -200,11 +200,9 @@ If you're using Arch Linux, do note that already at the time of this writing,
 pacman is offering a newer version, which isn't compatible with the
 llvm-haskell bindings. You can use the Arch Rollback Machine.
 http://seblu.net/a/arm/packages/l/llvm/llvm-3.4.1-2-x86_64.pkg.tar.xz
-- Seems superfluous to mention but, you need gcc (GNU's C Compiler).
-Why? Because compiling the LLVM modules result in object files. Those files
-are not executable, the gcc linker will set the main function as an entry point
-appropriately and render the file executable (this should happen automatically
-from running this compiler).
+- (Might be superfluous but) gcc (GNU's C Compiler), as Compiling the LLVM modules 
+results in object files which will be linked by the gcc linker (it will be invoked
+implicitly by the Crisp compiler).
 - Although this repository already contains the neccessary primitive functions
 compiled as llvm-modules, if you wish to recompile them, you'd need clang
 as they are .c files which should reside as LLVM modules come link-time.
